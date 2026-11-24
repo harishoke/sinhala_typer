@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::cell::RefCell;
 
 use eframe::egui;
 use muda::{CheckMenuItem, Menu, MenuEvent, MenuItem};
@@ -50,110 +50,106 @@ fn tray_icon_rgba() -> Vec<u8> {
 }
 
 struct TrayHandles {
-    icon: Arc<TrayIcon>,
+    icon: TrayIcon,
     mode_english: CheckMenuItem,
     mode_unicode: CheckMenuItem,
     mode_legacy: CheckMenuItem,
     enabled: CheckMenuItem,
 }
 
-struct TrayMenuBuilt {
-    handles: TrayHandles,
+// Tray lives for the whole process on the main thread (muda/tray-icon
+// handles are not Send/Sync), so it survives settings-window failures.
+thread_local! {
+    static TRAY: RefCell<Option<TrayHandles>> = const { RefCell::new(None) };
 }
 
-impl TrayMenuBuilt {
-    fn build(state: &SharedState) -> Result<Self, String> {
-        let (mode, enabled) = {
-            let st = state.read().unwrap();
-            (st.config.mode, st.config.enabled)
-        };
-        let menu = Menu::new();
-        let mode_english = CheckMenuItem::with_id(ID_MODE_ENGLISH, "English", true, mode == Mode::English, None);
-        let mode_unicode = CheckMenuItem::with_id(ID_MODE_UNICODE, "Sinhala (Unicode)", true, mode == Mode::Unicode, None);
-        let mode_legacy = CheckMenuItem::with_id(ID_MODE_LEGACY, "Sinhala (FM Abhaya)", true, mode == Mode::LegacyFm, None);
-        let enabled = CheckMenuItem::with_id(ID_ENABLED, "Typing enabled", true, enabled, None);
-        for item in [&mode_english, &mode_unicode, &mode_legacy, &enabled] {
-            menu.append(item).map_err(|e| e.to_string())?;
-        }
-        let settings = MenuItem::with_id(ID_SETTINGS, "Settings...", true, None);
-        let exit = MenuItem::with_id(ID_EXIT, "Exit", true, None);
-        for item in [&settings, &exit] {
-            menu.append(item).map_err(|e| e.to_string())?;
-        }
-
-        let rgba = tray_icon_rgba();
-        let icon = Icon::from_rgba(rgba, ICON_SIZE, ICON_SIZE).map_err(|e| e.to_string())?;
-        let tray = TrayIconBuilder::new()
-            .with_menu(Box::new(menu))
-            .with_tooltip("Sinhala Typer")
-            .with_icon(icon)
-            .build()
-            .map_err(|e| e.to_string())?;
-        Ok(Self {
-            handles: TrayHandles {
-                icon: Arc::new(tray),
-                mode_english,
-                mode_unicode,
-                mode_legacy,
-                enabled,
-            },
-        })
+/// Create the tray icon + menu on the calling (main) thread. Must be called
+/// before the event loop starts so the same thread pumps its messages.
+pub fn init_tray(state: &SharedState) -> Result<(), String> {
+    let (mode, enabled) = {
+        let st = state.read().unwrap();
+        (st.config.mode, st.config.enabled)
+    };
+    let menu = Menu::new();
+    let mode_english = CheckMenuItem::with_id(ID_MODE_ENGLISH, "English", true, mode == Mode::English, None);
+    let mode_unicode = CheckMenuItem::with_id(ID_MODE_UNICODE, "Sinhala (Unicode)", true, mode == Mode::Unicode, None);
+    let mode_legacy = CheckMenuItem::with_id(ID_MODE_LEGACY, "Sinhala (FM Abhaya)", true, mode == Mode::LegacyFm, None);
+    let enabled = CheckMenuItem::with_id(ID_ENABLED, "Typing enabled", true, enabled, None);
+    for item in [&mode_english, &mode_unicode, &mode_legacy, &enabled] {
+        menu.append(item).map_err(|e| e.to_string())?;
     }
-}
-
-pub struct TyperApp {
-    state: SharedState,
-    tray: Option<TrayMenuBuilt>,
-    show_settings: bool,
-    hotkey_text: String,
-    legacy_text: String,
-    status: String,
-}
-
-impl TyperApp {
-    pub fn new(state: SharedState) -> Self {
-        let (hotkey_text, legacy_text) = {
-            let st = state.read().unwrap();
-            (st.config.hotkey.clone(), st.config.legacy_processes.join("\n"))
-        };
-        Self {
-            show_settings: false,
-            hotkey_text,
-            legacy_text,
-            status: String::new(),
-            tray: TrayMenuBuilt::build(&state).ok(),
-            state,
-        }
+    let settings = MenuItem::with_id(ID_SETTINGS, "Settings...", true, None);
+    let exit = MenuItem::with_id(ID_EXIT, "Exit", true, None);
+    for item in [&settings, &exit] {
+        menu.append(item).map_err(|e| e.to_string())?;
     }
 
-    fn handle_menu_event(&mut self, id: &str, ctx: &egui::Context) {
-        let mut st = self.state.write().unwrap();
-        match id {
-            ID_MODE_ENGLISH => st.config.mode = Mode::English,
-            ID_MODE_UNICODE => st.config.mode = Mode::Unicode,
-            ID_MODE_LEGACY => st.config.mode = Mode::LegacyFm,
-            ID_ENABLED => st.config.enabled = !st.config.enabled,
+    let icon = Icon::from_rgba(tray_icon_rgba(), ICON_SIZE, ICON_SIZE).map_err(|e| e.to_string())?;
+    let tray = TrayIconBuilder::new()
+        .with_menu(Box::new(menu))
+        .with_tooltip("Sinhala Typer")
+        .with_icon(icon)
+        .build()
+        .map_err(|e| e.to_string())?;
+    TRAY.with(|t| {
+        *t.borrow_mut() = Some(TrayHandles {
+            icon: tray,
+            mode_english,
+            mode_unicode,
+            mode_legacy,
+            enabled,
+        });
+    });
+    Ok(())
+}
+
+fn apply_menu_id(state: &SharedState, id: &str) {
+    let mut st = state.write().unwrap();
+    match id {
+        ID_MODE_ENGLISH => st.config.mode = Mode::English,
+        ID_MODE_UNICODE => st.config.mode = Mode::Unicode,
+        ID_MODE_LEGACY => st.config.mode = Mode::LegacyFm,
+        ID_ENABLED => st.config.enabled = !st.config.enabled,
+        _ => {}
+    }
+    let _ = st.config.save();
+}
+
+/// Drain tray events. `ctx` is None in the GUI-less fallback mode, where the
+/// Settings item is unavailable and Exit terminates the process.
+pub fn poll_events(state: &SharedState, ctx: Option<&egui::Context>) {
+    while let Ok(ev) = MenuEvent::receiver().try_recv() {
+        let id = ev.id.0.clone();
+        match id.as_str() {
             ID_SETTINGS => {
-                drop(st);
-                self.show_settings = true;
-                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
-                return;
+                if let Some(ctx) = ctx {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                }
             }
             ID_EXIT => {
-                drop(st);
                 crate::win::hook::stop();
-                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                return;
+                if let Some(ctx) = ctx {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                } else {
+                    std::process::exit(0);
+                }
             }
-            _ => {}
+            _ => apply_menu_id(state, &id),
         }
-        let _ = st.config.save();
     }
+    while let Ok(_ev) = TrayIconEvent::receiver().try_recv() {
+        if let Some(ctx) = ctx {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+        }
+    }
+    sync_tray(state);
+}
 
-    fn sync_tray(&mut self) {
-        let Some(tray) = &self.tray else { return };
-        let st = self.state.read().unwrap();
-        let h = &tray.handles;
+fn sync_tray(state: &SharedState) {
+    TRAY.with(|t| {
+        let guard = t.borrow();
+        let Some(h) = guard.as_ref() else { return };
+        let st = state.read().unwrap();
         let _ = h.mode_english.set_checked(st.config.mode == Mode::English);
         let _ = h.mode_unicode.set_checked(st.config.mode == Mode::Unicode);
         let _ = h.mode_legacy.set_checked(st.config.mode == Mode::LegacyFm);
@@ -168,22 +164,35 @@ impl TyperApp {
             mode_label,
             if st.config.enabled { "" } else { " (off)" }
         );
-        let icon = Arc::clone(&h.icon);
-        let _ = icon.set_tooltip(Some(&label));
-        drop(st);
+        let _ = h.icon.set_tooltip(Some(&label));
+    });
+}
+
+pub struct TyperApp {
+    state: SharedState,
+    hotkey_text: String,
+    legacy_text: String,
+    status: String,
+}
+
+impl TyperApp {
+    pub fn new(state: SharedState) -> Self {
+        let (hotkey_text, legacy_text) = {
+            let st = state.read().unwrap();
+            (st.config.hotkey.clone(), st.config.legacy_processes.join("\n"))
+        };
+        Self {
+            state,
+            hotkey_text,
+            legacy_text,
+            status: String::new(),
+        }
     }
 }
 
 impl eframe::App for TyperApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        while let Ok(ev) = MenuEvent::receiver().try_recv() {
-            self.handle_menu_event(ev.id.0.as_str(), ctx);
-        }
-        while let Ok(_ev) = TrayIconEvent::receiver().try_recv() {
-            self.show_settings = true;
-            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
-        }
-        self.sync_tray();
+        poll_events(&self.state, Some(ctx));
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Sinhala Typer — Settings");
@@ -245,4 +254,3 @@ impl eframe::App for TyperApp {
         ctx.request_repaint_after(std::time::Duration::from_millis(300));
     }
 }
-

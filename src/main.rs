@@ -10,7 +10,7 @@ mod ui;
 mod win;
 
 #[cfg(target_os = "windows")]
-fn main() -> Result<(), eframe::Error> {
+fn main() {
     let cfg = config::Config::load();
     let state = state::shared_state(cfg);
 
@@ -27,6 +27,10 @@ fn main() -> Result<(), eframe::Error> {
     let hook_state = state.clone();
     win::hook::spawn(hook_state);
 
+    if let Err(err) = ui::init_tray(&state) {
+        eprintln!("sinhala_typer: tray unavailable: {err}");
+    }
+
     // Glow (OpenGL) is the default renderer; wgpu is a fallback for systems
     // with broken or missing GL drivers (select with SINHALA_TYPER_RENDERER=wgpu).
     let renderer = if std::env::var("SINHALA_TYPER_RENDERER").as_deref() == Ok("wgpu") {
@@ -42,20 +46,21 @@ fn main() -> Result<(), eframe::Error> {
             .with_min_inner_size([380.0, 420.0]),
         ..Default::default()
     };
-    eframe::run_native(
+    let result = eframe::run_native(
         "Sinhala Typer",
         options,
-        Box::new(|_cc| Ok(Box::new(ui::TyperApp::new(state)))),
-    )
-    .map_err(|err| {
-        eprintln!("sinhala_typer: UI failed: {err}");
+        Box::new(|_cc| Ok(Box::new(ui::TyperApp::new(state.clone())))),
+    );
+    if let Err(err) = result {
+        // No usable GPU/renderer: keep running tray-only so typing still works.
+        eprintln!("sinhala_typer: settings window unavailable ({err}); running tray-only");
         let log = config::Config::config_dir().join("last_error.txt");
         if let Some(parent) = log.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
         let _ = std::fs::write(&log, format!("{err}"));
-        err
-    })
+        win::pump::pump_forever(state);
+    }
 }
 
 #[cfg(not(target_os = "windows"))]
