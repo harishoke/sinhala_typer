@@ -7,11 +7,17 @@ MS Office. Minimal system tray UI plus an on-demand Settings & Info window.
 
 ## Status
 
-Phases 0-2 done. The pure-Rust engine core (`src/engine/`) is platform-independent
+Phases 0-4 done. The pure-Rust engine core (`src/engine/`) is platform-independent
 and fully tested anywhere: `phonetic.rs` (Singlish -> Sinhala Unicode, streaming with
-smart backspace) and `legacy.rs` (Unicode -> FM Abhaya + `render_diff`). The
+smart backspace) and `legacy.rs` (Unicode -> FM Abhaya + `render_diff`).
 Windows-only modules (`src/win/`, `src/ui/`) are compiled only on Windows
-(`cfg(target_os = "windows")`).
+(`cfg(target_os = "windows")`) and type-checked here with
+`cargo check --target x86_64-pc-windows-msvc`:
+`win/hook.rs` (WH_KEYBOARD_LL + SendInput, toggle hotkey, per-app modes, legacy
+re-render via `render_diff`), `win/app_detect.rs` (WinEvent-cached foreground exe),
+`win/startup.rs` (single-instance mutex, Run key), `config.rs` (TOML at
+%APPDATA%\\sinhala_typer\\config.toml), `ui/tray.rs` (tray icon + menu, spawns
+`--settings` child), `ui/settings.rs` (egui window).
 
 ## Layout
 
@@ -30,6 +36,18 @@ Windows-only modules (`src/win/`, `src/ui/`) are compiled only on Windows
 - `cargo test` — engine unit tests (runs on any OS)
 - `cargo run` — run the app (Windows)
 - `cargo build --release` — optimized binary in `target/release/`
+
+## Run and install
+
+On Windows:
+
+- Portable: `cargo build --release`, then run `target\release\sinhala_typer.exe`
+  (config is created in `%APPDATA%\sinhala_typer\config.toml` on first run)
+- Installer: `.\installer\build_release.ps1 -Package` (needs Inno Setup 6), or
+  download `sinhala_typer_setup.exe` from the GitHub Actions artifacts
+  (`.github/workflows/build.yml` builds the exe + installer on every push/PR)
+- `sinhala_typer.exe --settings` opens the Settings & Info window standalone
+- `sinhala_typer.exe --set-startup` enables Start with Windows and exits
 
 ## Resource targets
 
