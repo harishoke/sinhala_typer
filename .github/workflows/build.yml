@@ -34,9 +34,17 @@ jobs:
       - name: Smoke test (process stays alive with hook + tray)
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "target\release\sinhala_typer.exe" -PassThru
+          $err = New-TemporaryFile
+          $p = Start-Process -FilePath "target\release\sinhala_typer.exe" -PassThru -RedirectStandardError $err.FullName
           Start-Sleep -Seconds 8
           if ($p.HasExited) {
+            Write-Host "--- stderr ---"
+            Get-Content $err.FullName | Write-Host
+            $log = Join-Path $env:APPDATA "sinhala_typer\last_error.txt"
+            if (Test-Path $log) {
+              Write-Host "--- last_error.txt ---"
+              Get-Content $log | Write-Host
+            }
             Write-Error "sinhala_typer.exe exited prematurely with code $($p.ExitCode)"
             exit 1
           }

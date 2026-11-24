@@ -39,6 +39,15 @@ fn main() -> Result<(), eframe::Error> {
         options,
         Box::new(|_cc| Ok(Box::new(ui::TyperApp::new(state)))),
     )
+    .map_err(|err| {
+        eprintln!("sinhala_typer: UI failed: {err}");
+        let log = config::Config::config_dir().join("last_error.txt");
+        if let Some(parent) = log.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&log, format!("{err}"));
+        err
+    })
 }
 
 #[cfg(not(target_os = "windows"))]
