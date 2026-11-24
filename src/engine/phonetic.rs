@@ -100,13 +100,19 @@ fn diff(old: &str, new: &str) -> EditAction {
     }
 }
 
-#[derive(Default)]
 pub struct PhoneticEngine {
     roman: String,
     emitted: String,
 }
 
 impl PhoneticEngine {
+    pub const fn new() -> Self {
+        Self {
+            roman: String::new(),
+            emitted: String::new(),
+        }
+    }
+
     pub fn accepts(c: char) -> bool {
         c.is_ascii_alphabetic() && KEYS.iter().any(|(k, _)| k.starts_with(c))
     }
@@ -216,11 +222,21 @@ impl PhoneticEngine {
         self.emitted.clear();
     }
 
+    pub fn current_unicode(&self) -> &str {
+        &self.emitted
+    }
+
     fn refresh(&mut self) -> EditAction {
         let new = Self::convert(&self.roman);
         let action = diff(&self.emitted, &new);
         self.emitted = new;
         action
+    }
+}
+
+impl Default for PhoneticEngine {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
