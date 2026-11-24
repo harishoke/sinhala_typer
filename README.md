@@ -37,7 +37,18 @@ Settings live in `%APPDATA%\sinhala_typer\settings.toml`.
   These files are owned by the product owner; no AI may invent their contents.
 - `assets/` — tray icons and bundled font (TODO, added on Windows)
 
-## Commands
+## Build & install
+
+Continuous integration (`.github/workflows/build.yml`) runs the engine test
+suite, builds the optimized Windows binary, smoke-tests it, and produces a
+signed-ready Inno Setup installer (`dist/sinhala_typer-setup-<version>.exe`):
+
+- every push/PR: binaries + installer are uploaded as workflow artifacts
+- every tag `v*`: a draft GitHub Release is created with the portable `.exe`
+  and the setup installer attached
+
+To build locally on Windows: `cargo build --release` produces the binary and
+`iscc installer/sinhala_typer.iss` (Inno Setup 6) builds the installer.
 
 - `cargo check` — fast compile check
 - `cargo test` — engine unit tests (runs on any OS)
