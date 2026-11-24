@@ -14,6 +14,13 @@ fn main() {
         ui::settings::run();
         return;
     }
+    if args.iter().any(|a| a == "--set-startup") {
+        let mut cfg = config::load();
+        cfg.start_with_windows = true;
+        let _ = win::startup::set_start_with_windows(true);
+        let _ = config::save(&cfg);
+        return;
+    }
     if !win::startup::acquire_single_instance() {
         return;
     }

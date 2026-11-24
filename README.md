@@ -37,6 +37,18 @@ re-render via `render_diff`), `win/app_detect.rs` (WinEvent-cached foreground ex
 - `cargo run` — run the app (Windows)
 - `cargo build --release` — optimized binary in `target/release/`
 
+## Run and install
+
+On Windows:
+
+- Portable: `cargo build --release`, then run `target\release\sinhala_typer.exe`
+  (config is created in `%APPDATA%\sinhala_typer\config.toml` on first run)
+- Installer: `.\installer\build_release.ps1 -Package` (needs Inno Setup 6), or
+  download `sinhala_typer_setup.exe` from the GitHub Actions artifacts
+  (`.github/workflows/build.yml` builds the exe + installer on every push/PR)
+- `sinhala_typer.exe --settings` opens the Settings & Info window standalone
+- `sinhala_typer.exe --set-startup` enables Start with Windows and exits
+
 ## Resource targets
 
 Background tray process: ~10-15 MB RAM, ~0% idle CPU, tiny release binary

@@ -1,0 +1,47 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test
+      - run: cargo build --release
+
+  artifacts:
+    needs: [test-linux, test-windows]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - name: Portable exe + assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: sinhala_typer-portable
+          path: |
+            target/release/sinhala_typer.exe
+            assets/
+      - name: Install Inno Setup 6
+        run: choco install innosetup --version 6.3.3 -y
+      - name: Build installer
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\sinhala_typer.iss'
+      - name: Installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sinhala_typer_setup.exe
+          path: installer/output/sinhala_typer_setup.exe
