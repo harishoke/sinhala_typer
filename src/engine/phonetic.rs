@@ -216,6 +216,10 @@ impl PhoneticEngine {
         self.emitted.clear();
     }
 
+    pub fn is_active(&self) -> bool {
+        !self.roman.is_empty()
+    }
+
     fn refresh(&mut self) -> EditAction {
         let new = Self::convert(&self.roman);
         let action = diff(&self.emitted, &new);
