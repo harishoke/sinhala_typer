@@ -27,7 +27,15 @@ fn main() -> Result<(), eframe::Error> {
     let hook_state = state.clone();
     win::hook::spawn(hook_state);
 
+    // Glow (OpenGL) is the default renderer; wgpu is a fallback for systems
+    // with broken or missing GL drivers (select with SINHALA_TYPER_RENDERER=wgpu).
+    let renderer = if std::env::var("SINHALA_TYPER_RENDERER").as_deref() == Ok("wgpu") {
+        eframe::Renderer::Wgpu
+    } else {
+        eframe::Renderer::Glow
+    };
     let options = eframe::NativeOptions {
+        renderer,
         viewport: eframe::egui::ViewportBuilder::default()
             .with_visible(false)
             .with_inner_size([420.0, 520.0])

@@ -34,21 +34,31 @@ jobs:
       - name: Smoke test (process stays alive with hook + tray)
         shell: pwsh
         run: |
-          $err = New-TemporaryFile
-          $p = Start-Process -FilePath "target\release\sinhala_typer.exe" -PassThru -RedirectStandardError $err.FullName
-          Start-Sleep -Seconds 8
-          if ($p.HasExited) {
-            Write-Host "--- stderr ---"
-            Get-Content $err.FullName | Write-Host
-            $log = Join-Path $env:APPDATA "sinhala_typer\last_error.txt"
-            if (Test-Path $log) {
-              Write-Host "--- last_error.txt ---"
-              Get-Content $log | Write-Host
+          function Try-Smoke($envExtra) {
+            $err = New-TemporaryFile
+            $psi = new-object System.Diagnostics.ProcessStartInfo
+            $psi.FileName = "target\release\sinhala_typer.exe"
+            $psi.WorkingDirectory = (Get-Location)
+            foreach ($k in $envExtra.Keys) { $psi.EnvironmentVariables[$k] = $envExtra[$k] }
+            $psi.RedirectStandardError = $true
+            $p = [System.Diagnostics.Process]::Start($psi)
+            Start-Sleep -Seconds 8
+            if (-not $p.HasExited) {
+              Stop-Process -Id $p.Id -Force
+              return $true
             }
-            Write-Error "sinhala_typer.exe exited prematurely with code $($p.ExitCode)"
+            Write-Host "exited with code $($p.ExitCode):"
+            $p.StandardError.ReadToEnd() | Write-Host
+            return $false
+          }
+          if (Try-Smoke @{}) {
+            Write-Host "smoke ok (glow renderer)"
+          } elseif (Try-Smoke @{ SINHALA_TYPER_RENDERER = "wgpu" }) {
+            Write-Host "smoke ok (wgpu fallback)"
+          } else {
+            Write-Error "sinhala_typer.exe exited prematurely under both renderers"
             exit 1
           }
-          Stop-Process -Id $p.Id -Force
       - name: Extract version
         id: ver
         shell: bash
