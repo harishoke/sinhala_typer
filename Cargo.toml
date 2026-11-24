@@ -19,7 +19,7 @@ windows = { version = "0.58", features = [
 ] }
 tray-icon = "0.19"
 muda = "0.15"
-eframe = "0.29"
+eframe = { version = "0.29", features = ["wgpu"] }
 
 [profile.release]
 opt-level = "z"
