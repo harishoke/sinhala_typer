@@ -20,6 +20,10 @@ The app is feature-complete for a first usable release. The pure-Rust engine cor
 - Foreground-app detection to auto-switch to FM Abhaya in MS Office apps
 - System tray menu + settings window (eframe/egui), config persisted to TOML
 - Optional autostart via the `Run` registry key
+- Graceful degradation: if no GPU/OpenGL renderer is available (e.g. RDP or
+  headless sessions), the app logs the error and keeps running tray-only so
+  typing still works; a wgpu fallback renderer can be selected with
+  `SINHALA_TYPER_RENDERER=wgpu`
 
 Settings live in `%APPDATA%\sinhala_typer\settings.toml`.
 
