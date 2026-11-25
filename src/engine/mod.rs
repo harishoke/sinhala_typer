@@ -1,7 +1,7 @@
 pub mod legacy;
 pub mod phonetic;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum Mode {
     English,
     #[default]
@@ -23,7 +23,9 @@ pub struct ScreenSim {
 #[cfg(test)]
 impl ScreenSim {
     pub fn new() -> Self {
-        Self { text: String::new() }
+        Self {
+            text: String::new(),
+        }
     }
 
     pub fn apply(&mut self, action: &EditAction) {
