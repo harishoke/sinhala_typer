@@ -54,6 +54,6 @@
 - Version bumped to 1.1.0; the installer defaults to the same version
   (it previously fell back to 0.1.0) and carries a real publisher name
   and support URL.
-- The phonetic keymap data file was renamed `data/keymap_helakuru.md`
-  -> `data/keymap.md`; the mapping tables themselves are unchanged.
+- The phonetic keymap data file was renamed to `data/keymap.md`;
+  the mapping tables themselves are unchanged.
 - Release builds no longer open a console window (`windows_subsystem`).
