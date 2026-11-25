@@ -103,7 +103,10 @@ fn is_after_sign(c: char) -> bool {
 }
 
 fn is_before_sign(c: char) -> bool {
-    matches!(c, '\u{0DD9}' | '\u{0DDB}' | '\u{0DDA}' | '\u{0DDC}' | '\u{0DDD}' | '\u{0DDE}')
+    matches!(
+        c,
+        '\u{0DD9}' | '\u{0DDB}' | '\u{0DDA}' | '\u{0DDC}' | '\u{0DDD}' | '\u{0DDE}'
+    )
 }
 
 fn before_sign_parts(c: char) -> (&'static str, Option<char>, &'static str) {
@@ -218,7 +221,12 @@ pub fn unicode_to_fm_abhaya(input: &str) -> String {
     let mut i = 0;
     while i < cs.len() {
         let c = cs[i];
-        if c == RAKA && i + 3 < cs.len() && cs[i + 1] == AL_LAKUNA && cs[i + 2] == ZWJ && is_consonant(cs[i + 3]) {
+        if c == RAKA
+            && i + 3 < cs.len()
+            && cs[i + 1] == AL_LAKUNA
+            && cs[i + 2] == ZWJ
+            && is_consonant(cs[i + 3])
+        {
             push_consonant(&mut out, cs[i + 3]);
             out.push('_');
             i += 4;
@@ -226,7 +234,11 @@ pub fn unicode_to_fm_abhaya(input: &str) -> String {
         }
         if is_consonant(c) {
             let j = i + 1;
-            if j + 2 < cs.len() && cs[j] == AL_LAKUNA && cs[j + 1] == ZWJ && (cs[j + 2] == RAKA || cs[j + 2] == YANSA) {
+            if j + 2 < cs.len()
+                && cs[j] == AL_LAKUNA
+                && cs[j + 1] == ZWJ
+                && (cs[j + 2] == RAKA || cs[j + 2] == YANSA)
+            {
                 push_consonant(&mut out, c);
                 out.push(if cs[j + 2] == RAKA { '%' } else { 'H' });
                 i = j + 3;
@@ -290,7 +302,10 @@ pub fn render_diff(on_screen_legacy: &str, new_unicode_word: &str) -> EditAction
     let old_chars: Vec<char> = on_screen_legacy.chars().collect();
     let new_chars: Vec<char> = target.chars().collect();
     let mut common = 0;
-    while common < old_chars.len() && common < new_chars.len() && old_chars[common] == new_chars[common] {
+    while common < old_chars.len()
+        && common < new_chars.len()
+        && old_chars[common] == new_chars[common]
+    {
         common += 1;
     }
     EditAction {
@@ -314,16 +329,34 @@ mod tests {
         ("\u{0D9A}\u{0DCA}\u{200D}\u{0DBB}\u{0DB8}", "l%u"),
         ("\u{0DBD}\u{0D82}\u{0D9A}\u{0DCF}", ",xld"),
         ("\u{0DBD}\u{0D82}\u{0D9A}\u{0DCF}\u{0DC0}", ",xldj"),
-        ("\u{0DC0}\u{0DD2}\u{0DAF}\u{0DCA}\u{200D}\u{0DBA}\u{0DCF}\u{0DC0}", "\u{00FA}oHdj"),
+        (
+            "\u{0DC0}\u{0DD2}\u{0DAF}\u{0DCA}\u{200D}\u{0DBA}\u{0DCF}\u{0DC0}",
+            "\u{00FA}oHdj",
+        ),
         ("\u{0DC3}\u{0DD2}\u{0D82}\u{0DC4}\u{0DBD}", "isxy,"),
-        ("\u{0DC1}\u{0DCA}\u{200D}\u{0DBB}\u{0DD3} \u{0DBD}\u{0D82}\u{0D9A}\u{0DCF}", "Y%S ,xld"),
-        ("\u{0D86}\u{0DBA}\u{0DD4}\u{0DB6}\u{0DDD}\u{0DC0}\u{0DB1}\u{0DCA}", "wdhqfndajka"),
-        ("\u{0D89}\u{0DC3}\u{0DCA}\u{0DAD}\u{0DD4}\u{0DAD}\u{0DD2}", "bia;q;s"),
-        ("\u{0D9A}\u{0DDC}\u{0DC4}\u{0DDC}\u{0DB8}\u{0DAF}", "fldfyduo"),
+        (
+            "\u{0DC1}\u{0DCA}\u{200D}\u{0DBB}\u{0DD3} \u{0DBD}\u{0D82}\u{0D9A}\u{0DCF}",
+            "Y%S ,xld",
+        ),
+        (
+            "\u{0D86}\u{0DBA}\u{0DD4}\u{0DB6}\u{0DDD}\u{0DC0}\u{0DB1}\u{0DCA}",
+            "wdhqfndajka",
+        ),
+        (
+            "\u{0D89}\u{0DC3}\u{0DCA}\u{0DAD}\u{0DD4}\u{0DAD}\u{0DD2}",
+            "bia;q;s",
+        ),
+        (
+            "\u{0D9A}\u{0DDC}\u{0DC4}\u{0DDC}\u{0DB8}\u{0DAF}",
+            "fldfyduo",
+        ),
         ("\u{0DB4}\u{0DB1}\u{0DCA}\u{0DC3}\u{0DBD}", "mkai,"),
         ("\u{0D9C}\u{0DB8}\u{0DB1}", ".uk"),
         ("\u{0DB4}\u{0DCF}\u{0DC3}\u{0DBD}", "mdi,"),
-        ("\u{0D9A}\u{0DCF}\u{0DB1}\u{0DCA}\u{0DAD}\u{0DCF}\u{0DC0}", "ldka;dj"),
+        (
+            "\u{0D9A}\u{0DCF}\u{0DB1}\u{0DCA}\u{0DAD}\u{0DCF}\u{0DC0}",
+            "ldka;dj",
+        ),
         ("\u{0DC1}\u{0DD2}\u{0DC2}\u{0DCA}\u{200D}\u{0DBA}", "YsIH"),
         ("\u{0DB0}\u{0DBB}\u{0DCA}\u{200D}\u{0DB8}", "Ou_"),
         ("\u{0D9A}\u{0DBB}\u{0DCA}\u{200D}\u{0DB8}", "lu_"),
@@ -344,59 +377,82 @@ mod tests {
     #[test]
     fn part_b_verified_pairs() {
         for (unicode, expected) in PART_B {
-            assert_eq!(unicode_to_fm_abhaya(unicode), *expected, "input: {}", unicode);
+            assert_eq!(
+                unicode_to_fm_abhaya(unicode),
+                *expected,
+                "input: {}",
+                unicode
+            );
         }
     }
 
     const PART_C_FM: &[(&str, &[(&str, &str)])] = &[
-        ("krama", &[
-            ("k", "la"),
-            ("kr", "la\u{00BE}"),
-            ("kra", "l%"),
-            ("kram", "l%\u{00EF}"),
-            ("krama", "l%u"),
-        ]),
-        ("sinhala", &[
-            ("s", "ia"),
-            ("si", "is"),
-            ("sin", "iska"),
-            ("sinh", "isxya"),
-            ("sinha", "isxy"),
-            ("sinhal", "isxy,a"),
-            ("sinhala", "isxy,"),
-        ]),
-        ("shrii", &[
-            ("s", "ia"),
-            ("sh", "Ya"),
-            ("shr", "Ya\u{00BE}"),
-            ("shri", "Y%s"),
-            ("shrii", "Y%S"),
-        ]),
-        ("ammaa", &[
-            ("a", "w"),
-            ("am", "w\u{00EF}"),
-            ("amm", "w\u{00EF}\u{00EF}"),
-            ("amma", "w\u{00EF}u"),
-            ("ammaa", "w\u{00EF}ud"),
-        ]),
-        ("vidhyaava", &[
-            ("v", "\u{00F5}"),
-            ("vi", "\u{00FA}"),
-            ("vid", "\u{00FA}\u{00E2}"),
-            ("vidh", "\u{00FA}oa"),
-            ("vidhy", "\u{00FA}oaha"),
-            ("vidhya", "\u{00FA}oH"),
-            ("vidhyaa", "\u{00FA}oHd"),
-            ("vidhyaav", "\u{00FA}oHd\u{00F5}"),
-            ("vidhyaava", "\u{00FA}oHdj"),
-        ]),
-        ("Dharma", &[
-            ("D", "Va"),
-            ("Dh", "\u{00E8}"),
-            ("Dha", "O"),
-            ("Dhar", "O\u{00BE}"),
-            ("Dharma", "Ou_"),
-        ]),
+        (
+            "krama",
+            &[
+                ("k", "la"),
+                ("kr", "la\u{00BE}"),
+                ("kra", "l%"),
+                ("kram", "l%\u{00EF}"),
+                ("krama", "l%u"),
+            ],
+        ),
+        (
+            "sinhala",
+            &[
+                ("s", "ia"),
+                ("si", "is"),
+                ("sin", "iska"),
+                ("sinh", "isxya"),
+                ("sinha", "isxy"),
+                ("sinhal", "isxy,a"),
+                ("sinhala", "isxy,"),
+            ],
+        ),
+        (
+            "shrii",
+            &[
+                ("s", "ia"),
+                ("sh", "Ya"),
+                ("shr", "Ya\u{00BE}"),
+                ("shri", "Y%s"),
+                ("shrii", "Y%S"),
+            ],
+        ),
+        (
+            "ammaa",
+            &[
+                ("a", "w"),
+                ("am", "w\u{00EF}"),
+                ("amm", "w\u{00EF}\u{00EF}"),
+                ("amma", "w\u{00EF}u"),
+                ("ammaa", "w\u{00EF}ud"),
+            ],
+        ),
+        (
+            "vidhyaava",
+            &[
+                ("v", "\u{00F5}"),
+                ("vi", "\u{00FA}"),
+                ("vid", "\u{00FA}\u{00E2}"),
+                ("vidh", "\u{00FA}oa"),
+                ("vidhy", "\u{00FA}oaha"),
+                ("vidhya", "\u{00FA}oH"),
+                ("vidhyaa", "\u{00FA}oHd"),
+                ("vidhyaav", "\u{00FA}oHd\u{00F5}"),
+                ("vidhyaava", "\u{00FA}oHdj"),
+            ],
+        ),
+        (
+            "Dharma",
+            &[
+                ("D", "Va"),
+                ("Dh", "\u{00E8}"),
+                ("Dha", "O"),
+                ("Dhar", "O\u{00BE}"),
+                ("Dharma", "Ou_"),
+            ],
+        ),
     ];
 
     #[test]
@@ -407,14 +463,31 @@ mod tests {
                 let unicode_word = PhoneticEngine::convert(prefix);
                 let action = render_diff(sim.as_str(), &unicode_word);
                 sim.apply(&action);
-                assert_eq!(sim.as_str(), *expected_fm, "FM prefix: {} of {}", prefix, word);
+                assert_eq!(
+                    sim.as_str(),
+                    *expected_fm,
+                    "FM prefix: {} of {}",
+                    prefix,
+                    word
+                );
             }
         }
     }
 
     #[test]
     fn render_diff_property_all_prefixes() {
-        let words = ["krama", "sinhala", "Dharma", "shrii", "ammaa", "vidhyaava", "lankaa", "kohomadha", "isthuthi", "aayuboowan"];
+        let words = [
+            "krama",
+            "sinhala",
+            "Dharma",
+            "shrii",
+            "ammaa",
+            "vidhyaava",
+            "lankaa",
+            "kohomadha",
+            "isthuthi",
+            "aayuboowan",
+        ];
         for word in words {
             let mut sim = ScreenSim::new();
             for k in 0..=word.len() {
@@ -430,7 +503,10 @@ mod tests {
                     word
                 );
             }
-            assert_eq!(sim.as_str(), unicode_to_fm_abhaya(&PhoneticEngine::convert(word)));
+            assert_eq!(
+                sim.as_str(),
+                unicode_to_fm_abhaya(&PhoneticEngine::convert(word))
+            );
         }
     }
 
