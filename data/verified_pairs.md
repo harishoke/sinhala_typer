@@ -6,10 +6,10 @@ Test data for Prompts 1 and 2. **Rule for Mistral: use only the expected outputs
 
 | Part | What it is | How it was checked | Still needs you |
 | :--- | :--- | :--- | :--- |
-| A | Roman → Sinhala Unicode | Expected Sinhala typed by hand from known spellings, then **reproduced exactly (30/30) by an independent reference implementation of `keymap_helakuru.md`**. This proves the keymap is internally consistent and gives correct standard spellings. | Confirm against the real Helakuru app (Part D) |
+| A | Roman → Sinhala Unicode | Expected Sinhala typed by hand from known spellings, then **reproduced exactly (30/30) by an independent reference implementation of `keymap.md`**. This proves the keymap is internally consistent and gives correct standard spellings. | Confirm by manual typing (Part D) |
 | B | Sinhala Unicode → FM Abhaya | Generated from the MIT Pandukabhaya mapping; **round-tripped 30/30** through its FM→Unicode converter. Two words also match examples published by other packages. | Visual check in Word (`fm_abhaya_table.md` Section 8) |
 | C | Prefix expectations | Output of the reference implementation on every prefix | None (follows from Part A rules) |
-| D | Helakuru phone checklist | – | You (10 minutes) |
+| D | Manual verification checklist | – | You (10 minutes) |
 
 ## Part A: Roman → Sinhala Unicode
 
@@ -180,13 +180,13 @@ Each row: after typing the Roman prefix, the screen must equal the “Unicode sc
 
 For legacy mode the engine must call `render_diff(on_screen_fm, new_unicode_word)`. Example: in `krama`, typing `kr` changes ක්ර් to the rakaranshaya form on the next key, so backspaces are counted in **FM characters**, not Unicode ones.
 
-## Part D: Helakuru phone checklist (you do this, ~10 minutes)
+## Part D: Manual verification checklist (you do this, ~10 minutes)
 
-1. On your phone, open any text box with the **Helakuru keyboard** in **Phonetic** mode. **Turn off suggestions/prediction** if the app lets you; otherwise ignore the suggestion bar and keep typing.
+1. On your phone, open any text box with a Sinhala phonetic keyboard in **Phonetic** mode. **Turn off suggestions/prediction** if the app lets you; otherwise ignore the suggestion bar and keep typing.
 2. Type each Roman string from Part A and compare with the Sinhala column.
-3. For every mismatch, write what Helakuru produced in the last column and send me the list. I will update `keymap_helakuru.md` (and these pairs) so the spec matches the real app.
+3. For every mismatch, write what you actually got in the last column and send me the list. Update `keymap.md` (and these pairs) so the spec matches the verified result.
 
-| ☐ | Roman | Expected | Helakuru produced (if different) |
+| ☐ | Roman | Expected | Actually produced (if different) |
 | :--- | :--- | :--- | :--- |
 | ☐ | `mama` | මම | |
 | ☐ | `oya` | ඔය | |
