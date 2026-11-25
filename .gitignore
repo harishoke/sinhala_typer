@@ -1,1 +1,4 @@
 /target
+assets/*.ico
+assets/*.png
+assets/*.rgba
