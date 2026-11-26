@@ -3,7 +3,32 @@ use windows::Win32::Foundation::{CloseHandle, HANDLE, HWND};
 use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
+use windows::Win32::UI::Input::KeyboardAndMouse::GetKeyboardLayout;
 use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+
+/// LANG_SINHALESE primary language id (si-LK and si-IN layouts).
+const PRIMARY_LANG_SINHALESE: u32 = 0x5B;
+
+/// True when the foreground window's active Windows keyboard layout is a
+/// Sinhala one (chosen through the Windows language bar / Win+Space). In
+/// that case Windows itself is converting keystrokes, so Sinhala Typer must
+/// pass keys through untouched instead of converting a second time.
+pub fn foreground_is_sinhala_layout() -> bool {
+    unsafe {
+        let hwnd: HWND = GetForegroundWindow();
+        if hwnd.0.is_null() {
+            return false;
+        }
+        let mut pid: u32 = 0;
+        let tid =
+            windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if tid == 0 {
+            return false;
+        }
+        let hkl = GetKeyboardLayout(tid);
+        (hkl.0 as u32 & 0x3FF) == PRIMARY_LANG_SINHALESE
+    }
+}
 
 /// Lower-cased image name (e.g. `winword.exe`) of the foreground process.
 pub fn foreground_process_name() -> Option<String> {
