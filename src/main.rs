@@ -54,6 +54,26 @@ fn main() {
         eprintln!("sinhala_typer: tray unavailable: {err}");
     }
 
+    // One silent update check per launch: a toast only if a newer release
+    // exists and the user opted into notifications. Installing is a
+    // deliberate click in Settings -> Updates.
+    {
+        let state2 = state.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(8));
+            if let Ok(Some(v)) = win::update::check_latest() {
+                if state::lock_read(&state2).config.notifications {
+                    win::notify::show(
+                        "Sinhala Typer update",
+                        &format!(
+                            "Version {v} is available — open Settings, Updates to install it."
+                        ),
+                    );
+                }
+            }
+        });
+    }
+
     // Glow (OpenGL) is the default renderer; wgpu is a fallback for systems
     // with broken or missing GL drivers (select with SINHALA_TYPER_RENDERER=wgpu).
     let renderer = if std::env::var("SINHALA_TYPER_RENDERER").as_deref() == Ok("wgpu") {

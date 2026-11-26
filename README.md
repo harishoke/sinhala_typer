@@ -21,8 +21,8 @@
 
 | | |
 | :--- | :--- |
-| **Installer (recommended)** | [sinhala_typer-setup-1.2.0.exe](https://github.com/harishoke/sinhala_typer/releases/download/v1.2.0/sinhala_typer-setup-1.2.0.exe) — per-user install, no admin needed |
-| **Portable** | [sinhala_typer.exe](https://github.com/harishoke/sinhala_typer/releases/download/v1.2.0/sinhala_typer.exe) — single file, just run it |
+| **Installer (recommended)** | [sinhala_typer-setup-1.3.0.exe](https://github.com/harishoke/sinhala_typer/releases/download/v1.3.0/sinhala_typer-setup-1.3.0.exe) — per-user install, no admin needed |
+| **Portable** | [sinhala_typer.exe](https://github.com/harishoke/sinhala_typer/releases/download/v1.3.0/sinhala_typer.exe) — single file, just run it |
 
 The app starts **silently in the system tray**. Right-click the tray icon for modes and **Settings...**, or double-click it. Press **Ctrl+Alt+S** anywhere to cycle modes.
 
@@ -35,6 +35,8 @@ The app starts **silently in the system tray**. Right-click the tray icon for mo
 - **FM Abhaya done right** — correct legacy rendering in Word/Excel/PowerPoint (auto-detected), including real punctuation, which the FM font normally turns into letters.
 - **Case-sensitive keys** — `t`/`T`, `d`/`D`, `sh`/`Sh`, `Ru`/`Ruu`, `H` are different letters, honoring Shift and Caps Lock.
 - **Featherweight** — ~10–15 MB RAM, ~0% idle CPU, single instance, starts with Windows if you want it to.
+- **Real Windows keyboards** — optionally register Sinhala Typer (Unicode) and Sinhala Typer (FM Abhaya) as two keyboards under the Sinhala language (Settings → Windows keyboards, one admin prompt). Win+Space then switches typing modes like any other keyboard.
+- **In-app updates** — Settings → Updates checks for new versions and can download & install them in one click.
 - **Optional mode-change notifications** and a clean, dark Settings UI.
 
 ## ⌨️ How to type
@@ -62,7 +64,8 @@ The pure-Rust engine core (`src/engine/`) is platform-independent and fully test
 ## 📁 Layout
 
 - `src/engine/` — typing engines and shared types (`Mode`, `EditAction`)
-- `src/win/` — keyboard hook, synthesized input, foreground/layout detection, autostart, notifications
+- `src/win/` — keyboard hook, synthesized input, foreground/layout detection, autostart, notifications, TSF registration, in-app updates
+- `tsf/` — companion TSF text-service DLL registering the two Windows keyboards
 - `src/ui/` — tray icon/menu, settings window
 - `src/config.rs`, `src/state.rs` — settings/hotkey parsing and per-process mode selection (tested anywhere)
 - `data/` — verified linguistic data (keymap, FM Abhaya table, test pairs)

@@ -5,3 +5,5 @@ pub mod input;
 pub mod notify;
 pub mod pump;
 pub mod single_instance;
+pub mod tsf_reg;
+pub mod update;

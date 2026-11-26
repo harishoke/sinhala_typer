@@ -39,6 +39,8 @@ struct HookCtx {
     last_fg: Option<String>,
     layout_cache: Option<(Instant, bool)>,
     last_sinhala_layout: bool,
+    tsf_cache: Option<(Instant, Option<String>)>,
+    last_tsf: Option<String>,
 }
 
 thread_local! {
@@ -60,6 +62,8 @@ impl HookCtx {
             last_fg: None,
             layout_cache: None,
             last_sinhala_layout: false,
+            tsf_cache: None,
+            last_tsf: None,
         }
     }
 
@@ -137,7 +141,71 @@ impl HookCtx {
         }
     }
 
+    /// Active Sinhala Typer TSF profile ("unicode" / "fm" / "none"),
+    /// cached like the other foreground probes.
+    fn tsf_profile(&mut self) -> Option<String> {
+        let cached = self
+            .tsf_cache
+            .as_ref()
+            .filter(|(t, _)| t.elapsed() < Duration::from_millis(750))
+            .map(|(_, v)| v.clone());
+        match cached {
+            Some(v) => v,
+            None => {
+                let v = super::fg::tsf_profile();
+                self.tsf_cache = Some((Instant::now(), v.clone()));
+                v
+            }
+        }
+    }
+
+    /// Follow Windows keyboard switches: when the user picks one of the
+    /// Sinhala Typer keyboards (or leaves them) in the language bar, the
+    /// TSF DLL records it and the app mode follows — once per change, so
+    /// manual tray changes afterwards are not overridden.
+    /// Returns Some(mode) while one of our own TSF profiles is active.
+    fn follow_tsf(&mut self) -> Option<Mode> {
+        let current = self.tsf_profile();
+        if current != self.last_tsf {
+            let mapped = match current.as_deref() {
+                Some("unicode") => Some(Mode::Unicode),
+                Some("fm") => Some(Mode::LegacyFm),
+                Some("none") => Some(Mode::English),
+                _ => None,
+            };
+            if let Some(mode) = mapped {
+                let (changed, notify, enabled) = {
+                    let mut st = lock_write(&self.state);
+                    let changed = st.config.mode != mode;
+                    if changed {
+                        st.config.mode = mode;
+                        let _ = st.config.save();
+                    }
+                    (changed, st.config.notifications, st.config.enabled)
+                };
+                if changed {
+                    self.reset_buffers();
+                    if notify {
+                        super::notify::mode_changed(mode, enabled);
+                    }
+                }
+            }
+            self.last_tsf = current.clone();
+        }
+        match current.as_deref() {
+            Some("unicode") => Some(Mode::Unicode),
+            Some("fm") => Some(Mode::LegacyFm),
+            _ => None,
+        }
+    }
+
     fn effective_mode(&mut self) -> Mode {
+        // Our own TSF keyboards active: the hook does the conversion, and
+        // the Sinhala-layout pass-through below must NOT trigger (the
+        // foreground langid is Sinhala precisely because our profile is on).
+        if self.follow_tsf().is_some() {
+            return lock_read(&self.state).effective_mode(None);
+        }
         // Coexist with the Windows language bar: when the foreground window
         // is on a Sinhala layout the user picked in Windows (Win+Space),
         // Windows itself converts the keystrokes, so pass through untouched

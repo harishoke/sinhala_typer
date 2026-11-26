@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.3.0 — 2026-11-26
+
+### Fixed (reported against 1.2.0)
+- **Exit works again.** The close-to-tray handler cancelled *every* window
+  close, including the one from the tray menu's Exit item, so the app
+  could never quit. Exit (and the updater's hand-over) now set an explicit
+  flag and the process really terminates.
+- **Silent start, enforced.** The Settings window could still surface at
+  launch on some systems. The window now re-asserts its hidden state on
+  every frame until the user explicitly opens Settings from the tray
+  (menu item or double-click) — launch is always tray-only.
+
+### New
+- **Windows keyboard integration (TSF).** A companion text-service DLL
+  (`sinhala_typer_tsf.dll`, source in `tsf/`) registers two keyboards
+  under the Sinhala language — **Sinhala Typer (Unicode)** and
+  **Sinhala Typer (FM Abhaya)** — addable in Windows Settings → Language
+  → Sinhala → Keyboards. Switching with Win+Space / the language bar
+  switches the app mode to match. Opt-in from Settings → "Windows
+  keyboards" (one admin prompt for the one-time registration). First
+  release of this component: not yet smoke-tested on a real machine.
+- **In-app updates.** Settings → "Updates" checks GitHub Releases;
+  "Download & install" fetches the new installer, launches it and exits
+  cleanly so the exe can be replaced. A silent check also runs once per
+  launch (toast only, and only if notifications are enabled).
+
 ## 1.2.0
 
 ### Fixed

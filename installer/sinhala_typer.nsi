@@ -2,10 +2,10 @@
 ; Inno Setup script (sinhala_typer.iss). The GitHub Actions pipeline uses
 ; the Inno script; this one produces the same install layout and is used
 ; for local / cross-built releases.
-; Build: makensis /DVERSION=1.2.0 /DEXE=<path to sinhala_typer.exe> sinhala_typer.nsi
+; Build: makensis /DVERSION=1.3.0 /DEXE=<path to sinhala_typer.exe> /DTSF=<path to sinhala_typer_tsf.dll> sinhala_typer.nsi
 
 !ifndef VERSION
-  !define VERSION "1.2.0"
+  !define VERSION "1.3.0"
 !endif
 !ifndef EXE
   !define EXE "..\target\x86_64-pc-windows-gnu\release\sinhala_typer.exe"
@@ -47,6 +47,11 @@ Section "Sinhala Typer" SecMain
   SectionIn RO
   SetOutPath "$INSTDIR"
   File /oname=sinhala_typer.exe "${EXE}"
+!ifdef TSF
+  ; TSF text service for the Windows keyboard integration. Registration is
+  ; opt-in from Settings (one elevated regsvr32), not done by the installer.
+  File /oname=sinhala_typer_tsf.dll "${TSF}"
+!endif
   WriteRegStr HKCU "Software\Sinhala Typer" "InstallDir" "$INSTDIR"
   WriteUninstaller "$INSTDIR\uninstall.exe"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Sinhala Typer" "DisplayName" "Sinhala Typer"
@@ -78,6 +83,10 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\Sinhala Typer\Sinhala Typer.lnk"
   Delete "$SMPROGRAMS\Sinhala Typer\Uninstall.lnk"
   RMDir "$SMPROGRAMS\Sinhala Typer"
+  ; Best effort: unregister the TSF service if it was registered (needs
+  ; admin; silently skipped otherwise — Settings can remove it first).
+  ExecWait '"$SYSDIR\regsvr32.exe" /u /s "$INSTDIR\sinhala_typer_tsf.dll"'
+  Delete "$INSTDIR\sinhala_typer_tsf.dll"
   Delete "$INSTDIR\sinhala_typer.exe"
   Delete "$INSTDIR\uninstall.exe"
   RMDir "$INSTDIR"

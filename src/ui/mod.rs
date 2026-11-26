@@ -18,6 +18,23 @@ const ID_NOTIFY: &str = "notify";
 const ID_SETTINGS: &str = "settings";
 const ID_EXIT: &str = "exit";
 
+/// Set when the user really wants to quit (tray Exit, or the updater
+/// handing over to the installer). The close-request handler must let the
+/// window close in that case — v1.2.0 cancelled *every* close, which made
+/// Exit from the tray menu appear to do nothing.
+pub static EXITING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Ask the app to terminate: the UI loop notices and closes for real.
+pub fn request_exit() {
+    EXITING.store(true, std::sync::atomic::Ordering::SeqCst);
+    crate::win::hook::stop();
+}
+
+/// Set when the user explicitly opens Settings (tray menu / double-click).
+/// Only this — never a stray windowing event — may end the silent start.
+pub static SETTINGS_REQUESTED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 pub const ICON_SIZE: u32 = 32;
 
 /// Designed tray artwork (see `assets/`): one tile per state, generated from
@@ -186,13 +203,14 @@ pub fn poll_events(state: &SharedState, ctx: Option<&egui::Context>) {
         let id = ev.id.0.clone();
         match id.as_str() {
             ID_SETTINGS => {
+                SETTINGS_REQUESTED.store(true, std::sync::atomic::Ordering::SeqCst);
                 if let Some(ctx) = ctx {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
                     ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
                 }
             }
             ID_EXIT => {
-                crate::win::hook::stop();
+                request_exit();
                 if let Some(ctx) = ctx {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 } else {
@@ -204,6 +222,7 @@ pub fn poll_events(state: &SharedState, ctx: Option<&egui::Context>) {
     }
     while let Ok(ev) = TrayIconEvent::receiver().try_recv() {
         if matches!(ev, TrayIconEvent::DoubleClick { .. }) {
+            SETTINGS_REQUESTED.store(true, std::sync::atomic::Ordering::SeqCst);
             if let Some(ctx) = ctx {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
                 ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
@@ -267,6 +286,12 @@ pub struct TyperApp {
     status: String,
     icon_tex: Option<egui::TextureHandle>,
     style_applied: bool,
+    /// True once the user has actually opened Settings (tray menu or
+    /// double-click). Until then every frame re-asserts the hidden state:
+    /// v1.2.0 could still surface the window at launch on some systems,
+    /// and the user was explicit — silent start, always.
+    settings_shown: bool,
+    tsf_registered: Option<bool>,
 }
 
 impl TyperApp {
@@ -285,6 +310,8 @@ impl TyperApp {
             status: String::new(),
             icon_tex: None,
             style_applied: false,
+            settings_shown: false,
+            tsf_registered: None,
         }
     }
 
@@ -369,11 +396,27 @@ impl eframe::App for TyperApp {
         self.apply_style(ctx);
         poll_events(&self.state, Some(ctx));
 
-        // Closing Settings must never quit the app: the tray icon is the
-        // home of this program. Hide the window instead; it reopens from
-        // the tray menu ("Settings...") or a double-click on the icon.
+        let exiting = EXITING.load(std::sync::atomic::Ordering::SeqCst);
         if ctx.input(|i| i.viewport().close_requested()) {
+            if exiting {
+                // Tray Exit (or the updater): really terminate.
+                std::process::exit(0);
+            }
+            // Otherwise closing Settings must never quit the app: the tray
+            // icon is the home of this program. Hide the window instead;
+            // it reopens from the tray menu ("Settings...") or a
+            // double-click on the icon.
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+        }
+
+        // Silent start, enforced: until the user opens Settings from the
+        // tray, keep the window hidden no matter what the windowing layer
+        // decided to do at startup.
+        if SETTINGS_REQUESTED.swap(false, std::sync::atomic::Ordering::SeqCst) {
+            self.settings_shown = true;
+        }
+        if !self.settings_shown {
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
         }
 
@@ -501,6 +544,93 @@ impl eframe::App for TyperApp {
                         .clicked()
                     {
                         save_clicked = true;
+                    }
+                });
+
+                section(ui, "Windows keyboards", |ui| {
+                    ui.label("Add Sinhala Typer to the Windows language bar as two keyboards — Sinhala Typer (Unicode) and Sinhala Typer (FM Abhaya) — under Settings → Time & language → Language → Sinhala → Keyboards. Switching keyboards with Win+Space then switches this app's mode too.");
+                    if self.tsf_registered.is_none() {
+                        self.tsf_registered = Some(crate::win::tsf_reg::is_registered());
+                    }
+                    let registered = self.tsf_registered.unwrap_or(false);
+                    ui.add_space(4.0);
+                    if registered {
+                        ui.label(
+                            egui::RichText::new("Status: registered ✓")
+                                .color(egui::Color32::from_rgb(74, 222, 128)),
+                        );
+                        if ui.button("Remove the Windows keyboards").clicked() {
+                            match crate::win::tsf_reg::unregister() {
+                                Ok(()) => {
+                                    self.tsf_registered =
+                                        Some(crate::win::tsf_reg::is_registered());
+                                    self.status = "Keyboards removed.".to_string();
+                                }
+                                Err(e) => self.status = e,
+                            }
+                        }
+                    } else {
+                        ui.label(
+                            egui::RichText::new("Status: not registered")
+                                .color(egui::Color32::from_rgb(148, 163, 184)),
+                        );
+                        if ui.button("Add the Windows keyboards (one admin prompt)").clicked() {
+                            match crate::win::tsf_reg::register() {
+                                Ok(()) => {
+                                    self.tsf_registered =
+                                        Some(crate::win::tsf_reg::is_registered());
+                                    self.status =
+                                        "Keyboards added. Find them under the Sinhala language in Windows Settings.".to_string();
+                                }
+                                Err(e) => self.status = e,
+                            }
+                        }
+                    }
+                });
+
+                section(ui, "Updates", |ui| {
+                    use crate::win::update::UpdateState;
+                    match crate::win::update::state() {
+                        UpdateState::Idle | UpdateState::UpToDate => {
+                            ui.label(format!(
+                                "You have version {}.",
+                                env!("CARGO_PKG_VERSION")
+                            ));
+                            if ui.button("Check for updates").clicked() {
+                                crate::win::update::start_check();
+                            }
+                            if crate::win::update::state() == UpdateState::UpToDate {
+                                ui.label(
+                                    egui::RichText::new("This is the latest version ✓")
+                                        .color(egui::Color32::from_rgb(74, 222, 128)),
+                                );
+                            }
+                        }
+                        UpdateState::Checking => {
+                            ui.label("Checking for updates…");
+                        }
+                        UpdateState::Available(v) => {
+                            ui.label(
+                                egui::RichText::new(format!("Version {v} is available!"))
+                                    .strong()
+                                    .color(egui::Color32::from_rgb(74, 222, 128)),
+                            );
+                            if ui.button(format!("Download & install v{v}")).clicked() {
+                                crate::win::update::start_install(v);
+                            }
+                        }
+                        UpdateState::Downloading => {
+                            ui.label("Downloading the update… the installer will open when it is ready.");
+                        }
+                        UpdateState::Error(e) => {
+                            ui.label(
+                                egui::RichText::new(format!("Update check failed: {e}"))
+                                    .color(egui::Color32::from_rgb(252, 211, 77)),
+                            );
+                            if ui.button("Try again").clicked() {
+                                crate::win::update::start_check();
+                            }
+                        }
                     }
                 });
 

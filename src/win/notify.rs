@@ -14,10 +14,17 @@ pub fn mode_changed(mode: Mode, enabled: bool) {
         }
         .to_string()
     };
+    show("Sinhala Typer", &body);
+}
+
+/// Show a toast with an explicit title/body, from a helper thread.
+pub fn show(title: &str, body: &str) {
+    let title = title.to_string();
+    let body = body.to_string();
     std::thread::spawn(move || {
         let _ = notify_rust::Notification::new()
             .appname("Sinhala Typer")
-            .summary("Sinhala Typer")
+            .summary(&title)
             .body(&body)
             .show();
     });
