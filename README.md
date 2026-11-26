@@ -83,3 +83,9 @@ To build locally on Windows: `cargo build --release` produces the binary and
 
 Background tray process: ~10-15 MB RAM, ~0% idle CPU, tiny release binary
 (`opt-level = "z"`, LTO, stripped).
+
+## Credits
+
+Created by **Ashen Nethsara** —
+[LinkedIn](https://www.linkedin.com/in/ashennethsara/) ·
+[GitHub](https://github.com/AshenNethsara/)
