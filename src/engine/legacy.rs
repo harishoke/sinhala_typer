@@ -297,6 +297,34 @@ pub fn unicode_to_fm_abhaya(input: &str) -> String {
     out
 }
 
+/// In the FM Abhaya font most ASCII punctuation slots draw Sinhala glyphs
+/// (`,` is ල, `.` is ග, `;` is ත ...), so a punctuation key pressed in FM
+/// mode would show a letter, not the mark. This maps a punctuation character
+/// the user wants to the character whose FM Abhaya glyph *is* that mark.
+/// It is the inverse of the punctuation rows in the Pandukabhaya FM Abhaya
+/// mapping (`mappings.singles`, FM -> Unicode). Characters with no entry
+/// (digits, `-`, space, ...) already render as themselves in the font.
+pub fn fm_punctuation(c: char) -> Option<char> {
+    Some(match c {
+        ',' => '"',
+        '.' => '\'',
+        '?' => '@',
+        ':' => '(',
+        ';' => '\u{00A6}',
+        '!' => '\u{00E6}',
+        '(' => '^',
+        ')' => '&',
+        '"' => '\u{02DC}',
+        '/' => '$',
+        '%' => ']',
+        '=' => '}',
+        '+' => '\u{00AC}',
+        '{' => '\u{2122}',
+        '}' => '\u{0161}',
+        _ => return None,
+    })
+}
+
 pub fn render_diff(on_screen_legacy: &str, new_unicode_word: &str) -> EditAction {
     let target = unicode_to_fm_abhaya(new_unicode_word);
     let old_chars: Vec<char> = on_screen_legacy.chars().collect();
@@ -520,5 +548,35 @@ mod tests {
     #[test]
     fn unknown_chars_pass_through() {
         assert_eq!(unicode_to_fm_abhaya("a1! \u{0DB8}"), "a1! u");
+    }
+
+    #[test]
+    fn fm_punctuation_maps_to_glyphs_that_draw_the_mark() {
+        // Inverse of the Pandukabhaya singles rows: in the FM font the
+        // right-hand character is the one drawn as the left-hand mark.
+        let cases: &[(char, char)] = &[
+            (',', '"'),
+            ('.', '\''),
+            ('?', '@'),
+            (':', '('),
+            (';', '\u{00A6}'),
+            ('!', '\u{00E6}'),
+            ('(', '^'),
+            (')', '&'),
+            ('"', '\u{02DC}'),
+            ('/', '$'),
+            ('%', ']'),
+            ('=', '}'),
+            ('+', '\u{00AC}'),
+            ('{', '\u{2122}'),
+            ('}', '\u{0161}'),
+        ];
+        for (want, fm) in cases {
+            assert_eq!(fm_punctuation(*want), Some(*fm), "punct: {}", want);
+        }
+        // Digits, minus and letters need no substitution in FM mode.
+        assert_eq!(fm_punctuation('5'), None);
+        assert_eq!(fm_punctuation('-'), None);
+        assert_eq!(fm_punctuation('a'), None);
     }
 }
