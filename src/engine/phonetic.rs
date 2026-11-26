@@ -24,6 +24,15 @@ const KEYS: &[(&str, Token)] = &[
             sign: Some('\u{0DD1}'),
         },
     ),
+    (
+        "Ruu",
+        Token::Vowel {
+            independent: '\u{0D8E}',
+            sign: Some('\u{0DF2}'),
+        },
+    ),
+    ("chh", Token::Cons('\u{0DA1}')),
+    ("ch", Token::Cons('\u{0DA0}')),
     ("nng", Token::Cons('\u{0D9F}')),
     ("nnd", Token::Cons('\u{0DB3}')),
     ("nnD", Token::Cons('\u{0DAC}')),
@@ -94,7 +103,6 @@ const KEYS: &[(&str, Token)] = &[
     ("kh", Token::Cons('\u{0D9B}')),
     ("gh", Token::Cons('\u{0D9D}')),
     ("Ng", Token::Cons('\u{0D9E}')),
-    ("ch", Token::Cons('\u{0DA1}')),
     ("jh", Token::Cons('\u{0DA3}')),
     ("kn", Token::Cons('\u{0DA4}')),
     ("gn", Token::Cons('\u{0DA5}')),
@@ -267,7 +275,19 @@ impl PhoneticEngine {
                             pending = Some((YANSA, "conj", true));
                         } else if !emitted
                             && pending_tok == "n"
-                            && matches!(c, '\u{0D9A}' | '\u{0D9C}' | '\u{0DC4}')
+                            && matches!(
+                                c,
+                                '\u{0D9A}' | '\u{0D9B}'
+                                    | '\u{0D9C}'
+                                    | '\u{0D9D}'
+                                    | '\u{0D9E}'
+                                    | '\u{0DA0}'
+                                    | '\u{0DA1}'
+                                    | '\u{0DA2}'
+                                    | '\u{0DA3}'
+                                    | '\u{0DA4}'
+                                    | '\u{0DC4}'
+                            )
                         {
                             out.push(ANUSVARA);
                             pending = Some((*c, roman_tok, false));
@@ -438,7 +458,7 @@ mod tests {
         ("nnda", "\u{0DB3}"),
         ("nnDa", "\u{0DAC}"),
         ("nnga", "\u{0D9F}"),
-        ("cha", "\u{0DA1}"),
+        ("cha", "\u{0DA0}"),
         ("ca", "\u{0DA0}"),
         ("x", "\u{0D82}"),
         ("H", "\u{0D83}"),
@@ -455,6 +475,36 @@ mod tests {
     #[test]
     fn part_d_single_keys() {
         for (roman, expected) in PART_D_KEYS {
+            assert_eq!(screen_of(roman), *expected, "roman: {}", roman);
+        }
+    }
+
+    #[test]
+    fn aspirates_and_long_vowels_regressions() {
+        // Every mahapraana (aspirated) consonant with a plain and a long vowel.
+        let cases: &[(&str, &str)] = &[
+            ("kha", "\u{0D9B}"),
+            ("khaa", "\u{0D9B}\u{0DCF}"),
+            ("khii", "\u{0D9B}\u{0DD3}"),
+            ("gha", "\u{0D9D}"),
+            ("ghoo", "\u{0D9D}\u{0DDD}"),
+            ("cha", "\u{0DA0}"),
+            ("chha", "\u{0DA1}"),
+            ("jha", "\u{0DA3}"),
+            ("Tha", "\u{0DAE}"),
+            ("Dha", "\u{0DB0}"),
+            ("pha", "\u{0DB5}"),
+            ("bha", "\u{0DB7}"),
+            ("bhaava", "\u{0DB7}\u{0DCF}\u{0DC0}"),
+            // Long vocalic: Ruu is ඎ / sign ෲ (was untypable: "Ruu" gave ඍඋ).
+            ("Ruu", "\u{0D8E}"),
+            ("kRuu", "\u{0D9A}\u{0DF2}"),
+            // Anusvara before aspirates and palatals, not only before k/g/h.
+            ("sangha", "\u{0DC3}\u{0D82}\u{0D9D}"),
+            ("sancaara", "\u{0DC3}\u{0D82}\u{0DA0}\u{0DCF}\u{0DBB}"),
+            ("punchi", "\u{0DB4}\u{0DD4}\u{0D82}\u{0DA0}\u{0DD2}"),
+        ];
+        for (roman, expected) in cases {
             assert_eq!(screen_of(roman), *expected, "roman: {}", roman);
         }
     }
