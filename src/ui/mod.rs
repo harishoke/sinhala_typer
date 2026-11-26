@@ -14,6 +14,7 @@ const ID_MODE_ENGLISH: &str = "mode_english";
 const ID_MODE_UNICODE: &str = "mode_unicode";
 const ID_MODE_LEGACY: &str = "mode_legacy";
 const ID_ENABLED: &str = "enabled";
+const ID_NOTIFY: &str = "notify";
 const ID_SETTINGS: &str = "settings";
 const ID_EXIT: &str = "exit";
 
@@ -67,6 +68,8 @@ struct TrayHandles {
     mode_unicode: CheckMenuItem,
     mode_legacy: CheckMenuItem,
     enabled: CheckMenuItem,
+    notify: CheckMenuItem,
+    notify_checked: bool,
     visual: TrayVisual,
     tooltip: String,
 }
@@ -80,9 +83,13 @@ thread_local! {
 /// Create the tray icon + menu on the calling (main) thread. Must be called
 /// before the event loop starts so the same thread pumps its messages.
 pub fn init_tray(state: &SharedState) -> Result<(), String> {
-    let (mode, enabled) = {
+    let (mode, enabled, notifications) = {
         let st = lock_read(state);
-        (st.config.mode, st.config.enabled)
+        (
+            st.config.mode,
+            st.config.enabled,
+            st.config.notifications,
+        )
     };
     let visual = tray_visual(mode, enabled);
     let menu = Menu::new();
@@ -108,7 +115,14 @@ pub fn init_tray(state: &SharedState) -> Result<(), String> {
         None,
     );
     let enabled = CheckMenuItem::with_id(ID_ENABLED, "Typing enabled", true, enabled, None);
-    for item in [&mode_english, &mode_unicode, &mode_legacy, &enabled] {
+    let notify = CheckMenuItem::with_id(
+        ID_NOTIFY,
+        "Notify on mode change",
+        true,
+        notifications,
+        None,
+    );
+    for item in [&mode_english, &mode_unicode, &mode_legacy, &enabled, &notify] {
         menu.append(item).map_err(|e| e.to_string())?;
     }
     let settings = MenuItem::with_id(ID_SETTINGS, "Settings...", true, None);
@@ -130,6 +144,8 @@ pub fn init_tray(state: &SharedState) -> Result<(), String> {
             mode_unicode,
             mode_legacy,
             enabled,
+            notify,
+            notify_checked: notifications,
             visual,
             tooltip: "Sinhala Typer".to_string(),
         });
@@ -138,15 +154,29 @@ pub fn init_tray(state: &SharedState) -> Result<(), String> {
 }
 
 fn apply_menu_id(state: &SharedState, id: &str) {
-    let mut st = lock_write(state);
-    match id {
-        ID_MODE_ENGLISH => st.config.mode = Mode::English,
-        ID_MODE_UNICODE => st.config.mode = Mode::Unicode,
-        ID_MODE_LEGACY => st.config.mode = Mode::LegacyFm,
-        ID_ENABLED => st.config.enabled = !st.config.enabled,
-        _ => {}
+    let mut notify_mode: Option<(Mode, bool)> = None;
+    {
+        let mut st = lock_write(state);
+        match id {
+            ID_MODE_ENGLISH => st.config.mode = Mode::English,
+            ID_MODE_UNICODE => st.config.mode = Mode::Unicode,
+            ID_MODE_LEGACY => st.config.mode = Mode::LegacyFm,
+            ID_ENABLED => st.config.enabled = !st.config.enabled,
+            ID_NOTIFY => st.config.notifications = !st.config.notifications,
+            _ => {}
+        }
+        let _ = st.config.save();
+        if matches!(
+            id,
+            ID_MODE_ENGLISH | ID_MODE_UNICODE | ID_MODE_LEGACY | ID_ENABLED
+        ) && st.config.notifications
+        {
+            notify_mode = Some((st.config.mode, st.config.enabled));
+        }
     }
-    let _ = st.config.save();
+    if let Some((mode, enabled)) = notify_mode {
+        crate::win::notify::mode_changed(mode, enabled);
+    }
 }
 
 /// Drain tray events. `ctx` is None in the GUI-less fallback mode, where the
@@ -158,6 +188,7 @@ pub fn poll_events(state: &SharedState, ctx: Option<&egui::Context>) {
             ID_SETTINGS => {
                 if let Some(ctx) = ctx {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
                 }
             }
             ID_EXIT => {
@@ -175,6 +206,7 @@ pub fn poll_events(state: &SharedState, ctx: Option<&egui::Context>) {
         if matches!(ev, TrayIconEvent::DoubleClick { .. }) {
             if let Some(ctx) = ctx {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
             }
         }
     }
@@ -185,10 +217,18 @@ fn sync_tray(state: &SharedState) {
     TRAY.with(|t| {
         let mut guard = t.borrow_mut();
         let Some(h) = guard.as_mut() else { return };
-        let (mode, enabled) = {
+        let (mode, enabled, notifications) = {
             let st = lock_read(state);
-            (st.config.mode, st.config.enabled)
+            (
+                st.config.mode,
+                st.config.enabled,
+                st.config.notifications,
+            )
         };
+        if notifications != h.notify_checked {
+            h.notify.set_checked(notifications);
+            h.notify_checked = notifications;
+        }
         let mode_label = match mode {
             Mode::English => "English",
             Mode::Unicode => "Sinhala (Unicode)",
@@ -225,6 +265,8 @@ pub struct TyperApp {
     hotkey_text: String,
     legacy_text: String,
     status: String,
+    icon_tex: Option<egui::TextureHandle>,
+    style_applied: bool,
 }
 
 impl TyperApp {
@@ -241,13 +283,108 @@ impl TyperApp {
             hotkey_text,
             legacy_text,
             status: String::new(),
+            icon_tex: None,
+            style_applied: false,
         }
     }
+
+    fn apply_style(&mut self, ctx: &egui::Context) {
+        if self.style_applied {
+            return;
+        }
+        self.style_applied = true;
+        let mut style = (*ctx.style()).clone();
+        style.spacing.item_spacing = egui::vec2(10.0, 10.0);
+        style.spacing.button_padding = egui::vec2(14.0, 7.0);
+        style.spacing.window_margin = egui::Margin::same(18.0);
+        let mut visuals = egui::Visuals::dark();
+        visuals.panel_fill = egui::Color32::from_rgb(17, 20, 27);
+        visuals.window_fill = egui::Color32::from_rgb(17, 20, 27);
+        visuals.extreme_bg_color = egui::Color32::from_rgb(10, 12, 16);
+        visuals.faint_bg_color = egui::Color32::from_rgb(24, 29, 38);
+        visuals.selection.bg_fill = egui::Color32::from_rgb(37, 99, 235);
+        visuals.hyperlink_color = egui::Color32::from_rgb(96, 165, 250);
+        visuals.widgets.noninteractive.rounding = egui::Rounding::same(10.0);
+        visuals.widgets.inactive.rounding = egui::Rounding::same(8.0);
+        visuals.widgets.hovered.rounding = egui::Rounding::same(8.0);
+        visuals.widgets.active.rounding = egui::Rounding::same(8.0);
+        style.visuals = visuals;
+        ctx.set_style(style);
+    }
+}
+
+const ACCENT: egui::Color32 = egui::Color32::from_rgb(45, 140, 240);
+const CARD_FILL: egui::Color32 = egui::Color32::from_rgb(24, 29, 38);
+
+fn section(ui: &mut egui::Ui, title: &str, body: impl FnOnce(&mut egui::Ui)) {
+    ui.add_space(14.0);
+    ui.label(
+        egui::RichText::new(title)
+            .size(15.0)
+            .strong()
+            .color(egui::Color32::from_rgb(226, 232, 240)),
+    );
+    ui.add_space(6.0);
+    egui::Frame::none()
+        .fill(CARD_FILL)
+        .rounding(egui::Rounding::same(12.0))
+        .inner_margin(egui::Margin::same(14.0))
+        .show(ui, body);
+}
+
+fn mode_row(
+    ui: &mut egui::Ui,
+    cfg_mode: &mut Mode,
+    value: Mode,
+    title: &str,
+    desc: &str,
+) {
+    let selected = *cfg_mode == value;
+    let frame = egui::Frame::none()
+        .fill(if selected {
+            egui::Color32::from_rgb(30, 58, 95)
+        } else {
+            egui::Color32::from_rgb(31, 38, 50)
+        })
+        .rounding(egui::Rounding::same(10.0))
+        .inner_margin(egui::Margin::same(10.0));
+    frame.show(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.radio_value(cfg_mode, value, "");
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new(title).strong().size(14.0));
+                ui.label(
+                    egui::RichText::new(desc)
+                        .size(12.0)
+                        .color(egui::Color32::from_rgb(148, 163, 184)),
+                );
+            });
+        });
+    });
+    ui.add_space(6.0);
 }
 
 impl eframe::App for TyperApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.apply_style(ctx);
         poll_events(&self.state, Some(ctx));
+
+        // Closing Settings must never quit the app: the tray icon is the
+        // home of this program. Hide the window instead; it reopens from
+        // the tray menu ("Settings...") or a double-click on the icon.
+        if ctx.input(|i| i.viewport().close_requested()) {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+        }
+
+        if self.icon_tex.is_none() {
+            let image = egui::ColorImage::from_rgba_unmultiplied(
+                [48, 48],
+                &app_art::APP_ICON_48,
+            );
+            self.icon_tex =
+                Some(ctx.load_texture("app-icon", image, egui::TextureOptions::LINEAR));
+        }
 
         // Work on a snapshot of the config and write it back at the end of
         // the frame if anything changed. Holding the write lock across the
@@ -259,54 +396,146 @@ impl eframe::App for TyperApp {
         let mut autostart_failed = false;
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Sinhala Typer - Settings");
-            ui.add_space(8.0);
-            ui.heading("Typing mode");
-            ui.radio_value(&mut cfg.mode, Mode::English, "English (pass-through)");
-            ui.radio_value(&mut cfg.mode, Mode::Unicode, "Sinhala (Unicode)");
-            ui.radio_value(&mut cfg.mode, Mode::LegacyFm, "Sinhala (FM Abhaya, for MS Office)");
-            ui.add_space(10.0);
-            ui.checkbox(&mut cfg.enabled, "Typing enabled");
-            ui.add_space(10.0);
-            ui.label("Mode hotkey:");
-            let response = ui.text_edit_singleline(&mut self.hotkey_text);
-            if response.changed() {
-                match crate::config::Hotkey::parse(&self.hotkey_text) {
-                    Ok(_) => {
-                        cfg.hotkey = self.hotkey_text.trim().to_string();
-                        self.status.clear();
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                // Header: icon, name, version, creator.
+                egui::Frame::none()
+                    .fill(egui::Color32::from_rgb(21, 34, 54))
+                    .rounding(egui::Rounding::same(14.0))
+                    .inner_margin(egui::Margin::same(14.0))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            if let Some(tex) = &self.icon_tex {
+                                ui.image((tex.id(), egui::vec2(48.0, 48.0)));
+                            }
+                            ui.vertical(|ui| {
+                                ui.label(
+                                    egui::RichText::new("Sinhala Typer")
+                                        .size(22.0)
+                                        .strong()
+                                        .color(egui::Color32::WHITE),
+                                );
+                                ui.label(
+                                    egui::RichText::new(format!(
+                                        "Version {}  ·  by Ashen Nethsara",
+                                        env!("CARGO_PKG_VERSION")
+                                    ))
+                                    .size(12.5)
+                                    .color(egui::Color32::from_rgb(148, 197, 255)),
+                                );
+                            });
+                        });
+                    });
+
+                section(ui, "Typing mode", |ui| {
+                    mode_row(
+                        ui,
+                        &mut cfg.mode,
+                        Mode::Unicode,
+                        "Sinhala (Unicode)",
+                        "Type Singlish, get Sinhala Unicode everywhere.",
+                    );
+                    mode_row(
+                        ui,
+                        &mut cfg.mode,
+                        Mode::LegacyFm,
+                        "Sinhala (FM Abhaya)",
+                        "Legacy font mode for MS Office documents.",
+                    );
+                    mode_row(
+                        ui,
+                        &mut cfg.mode,
+                        Mode::English,
+                        "English",
+                        "Pass-through: your keyboard works as normal.",
+                    );
+                    ui.checkbox(&mut cfg.enabled, "Typing enabled");
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "Tip: press {} anywhere to cycle modes. If you switch a window to a Sinhala layout in the Windows language bar, Sinhala Typer pauses there automatically.",
+                            cfg.hotkey
+                        ))
+                        .size(12.0)
+                        .color(egui::Color32::from_rgb(148, 163, 184)),
+                    );
+                });
+
+                section(ui, "General", |ui| {
+                    ui.checkbox(&mut cfg.notifications, "Notify me when the mode changes");
+                    if ui
+                        .checkbox(&mut cfg.autostart, "Start with Windows")
+                        .changed()
+                        && !crate::win::autostart::set_autostart(cfg.autostart)
+                    {
+                        autostart_failed = true;
                     }
-                    Err(err) => self.status = format!("Hotkey: {err}"),
+                    ui.add_space(4.0);
+                    ui.label("Mode hotkey (cycles the three modes):");
+                    let response = ui.text_edit_singleline(&mut self.hotkey_text);
+                    if response.changed() {
+                        match crate::config::Hotkey::parse(&self.hotkey_text) {
+                            Ok(_) => {
+                                cfg.hotkey = self.hotkey_text.trim().to_string();
+                                self.status.clear();
+                            }
+                            Err(err) => self.status = format!("Hotkey: {err}"),
+                        }
+                    }
+                    ui.label(
+                        egui::RichText::new("e.g. ctrl+alt+s")
+                            .size(12.0)
+                            .color(egui::Color32::from_rgb(148, 163, 184)),
+                    );
+                });
+
+                section(ui, "FM Abhaya apps", |ui| {
+                    ui.label(
+                        "These apps automatically use FM Abhaya mode while the mode is Sinhala (Unicode). One .exe per line:",
+                    );
+                    ui.add(
+                        egui::TextEdit::multiline(&mut self.legacy_text)
+                            .desired_width(f32::INFINITY)
+                            .desired_rows(4),
+                    );
+                    if ui
+                        .button(egui::RichText::new("Save app list").color(egui::Color32::WHITE))
+                        .clicked()
+                    {
+                        save_clicked = true;
+                    }
+                });
+
+                section(ui, "About", |ui| {
+                    ui.label("Lightweight Sinhala phonetic typing for Windows 10/11. Type Singlish and get Sinhala Unicode in real time, with a legacy FM Abhaya mode for MS Office.");
+                    ui.label("Ctrl / Alt / Win shortcuts (copy, paste, save...) always pass through unchanged.");
+                    ui.add_space(4.0);
+                    ui.horizontal(|ui| {
+                        ui.label("Created by");
+                        ui.label(egui::RichText::new("Ashen Nethsara").strong().color(ACCENT));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.hyperlink_to("LinkedIn", "https://www.linkedin.com/in/ashennethsara/");
+                        ui.label("·");
+                        ui.hyperlink_to("GitHub", "https://github.com/AshenNethsara/");
+                    });
+                    ui.add_space(4.0);
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "Config: {}",
+                            crate::config::Config::config_dir().display()
+                        ))
+                        .size(11.5)
+                        .color(egui::Color32::from_rgb(148, 163, 184)),
+                    );
+                });
+
+                if !self.status.is_empty() {
+                    ui.add_space(10.0);
+                    ui.label(
+                        egui::RichText::new(&self.status)
+                            .size(12.5)
+                            .color(egui::Color32::from_rgb(252, 211, 77)),
+                    );
                 }
-            }
-            ui.small("e.g. ctrl+alt+s (cycles English / Unicode / FM Abhaya)");
-            ui.add_space(10.0);
-            ui.label("Apps that should use FM Abhaya mode (one .exe per line):");
-            ui.add(
-                egui::TextEdit::multiline(&mut self.legacy_text)
-                    .desired_width(340.0)
-                    .desired_rows(4),
-            );
-            if ui.button("Save").clicked() {
-                save_clicked = true;
-            }
-            if ui.checkbox(&mut cfg.autostart, "Start with Windows").changed()
-                && !crate::win::autostart::set_autostart(cfg.autostart)
-            {
-                autostart_failed = true;
-            }
-            if !self.status.is_empty() {
-                ui.small(&self.status);
-            }
-            ui.add_space(10.0);
-            ui.collapsing("About", |ui| {
-                ui.small(format!(
-                    "Sinhala Typer {} - lightweight Sinhala phonetic typing for Windows.",
-                    env!("CARGO_PKG_VERSION")
-                ));
-                ui.small("Type Singlish and get Sinhala Unicode in real time, with a legacy FM Abhaya mode for MS Office.");
-                ui.small("Ctrl / Alt / Win shortcuts (copy, paste, save...) always pass through unchanged.");
-                ui.small(format!("Config: {}", crate::config::Config::config_dir().display()));
             });
         });
 
