@@ -67,8 +67,8 @@ fn main() {
             .with_visible(false)
             .with_title("Sinhala Typer")
             .with_icon(std::sync::Arc::new(ui::app_icon()))
-            .with_inner_size([420.0, 520.0])
-            .with_min_inner_size([380.0, 420.0]),
+            .with_inner_size([460.0, 640.0])
+            .with_min_inner_size([420.0, 520.0]),
         ..Default::default()
     };
     let result = eframe::run_native(
