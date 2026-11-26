@@ -25,7 +25,7 @@ Two consequences you should know about:
 | D5 | **Rakaranshaya:** consonant + `r` + vowel → C + U+0DCA + U+200D + ර + sign. Example: `krama` → ක්‍රම. | ✅ |
 | D6 | **Yansaya:** consonant + `y` + vowel → C + U+0DCA + U+200D + ය + sign. Example: `vidhyaava` → විද්‍යාව. | ✅ |
 | D7 | **Repaya:** `r` followed directly by a consonant (no vowel) → ර + U+0DCA + U+200D, then the consonant. Example: `Dharma` → ධර්‍ම. A `r` at the very end of a word or before a space is ර් with no ZWJ. | 🟡 |
-| D8 | **Anusvara (ං) automatic:** a plain `n` directly before `k`, `g` or `h` (no vowel between) → ං. Examples: `lankaa` → ලංකා, `sinhala` → සිංහල, `gangaa` → ගංගා. Any other `n` without a vowel is න් (e.g. `pansala` → පන්සල). Explicit anusvara: `x`. Visarga ඃ: `H`. | 🟡 |
+| D8 | **Anusvara (ං) automatic:** a plain `n` directly before a velar or palatal consonant (`k kh g gh Ng c ch j jh kn`) or `h` (no vowel between) → ං. Examples: `lankaa` → ලංකා, `sinhala` → සිංහල, `gangaa` → ගංගා, `sangha` → සංඝ, `sanchara` → සංචාරය, `punchi` → පුංචි. Any other `n` without a vowel is න් (e.g. `pansala` → පන්සල). Explicit anusvara: `x`. Visarga ඃ: `H`. | 🟡 |
 | D9 | **Prenasalised letters** use a doubled `n`: `nng` ඟ, `nnd` ඳ, `nnD` ඬ, `nnj` ඦ. `mb` → ඹ. These win by longest match over D8. | 🟡 |
 | D10 | Digits, spaces, punctuation and all unmapped characters pass through unchanged and **reset** the word state. | ✅ |
 | D11 | There is no escape key in the MVP. A sequence that is both a digraph and two letters (e.g. `sh` could be ස+හ) always becomes the digraph. | 🟡 |
@@ -45,6 +45,7 @@ Roman keys, their independent form (start of word / after a vowel), and their si
 | `u` | උ | U+0D8B | ු | U+0DD4 | ✅ |
 | `uu` | ඌ | U+0D8C | ූ | U+0DD6 | ✅ |
 | `Ru` | ඍ | U+0D8D | ෘ | U+0DD8 | 🟡 |
+| `Ruu` | ඎ | U+0D8E | ෲ | U+0DF2 | ✅ |
 | `e` | එ | U+0D91 | ෙ | U+0DD9 | ✅ |
 | `ee` | ඒ | U+0D92 | ේ | U+0DDA | ✅ |
 | `ai` | ඓ | U+0D93 | ෛ | U+0DDB | 🟡 |
@@ -65,7 +66,8 @@ The two-part vowels ො (U+0DDC), ෝ (U+0DDD), ෞ (U+0DDE) must be emitted as 
 | `Ng` | ඞ | U+0D9E | 🟡 | ඞ (rare) |
 | `nng` | ඟ | U+0D9F | 🟡 | prenasalised |
 | `c` | ච | U+0DA0 | ✅ |  |
-| `ch` | ඡ | U+0DA1 | 🟡 | ඡ = `ch`; plain `c` = ච |
+| `ch` | ච | U+0DA0 | ✅ | ච = `ch` (user decision 2026-11-26; same letter as `c`) |
+| `chh` | ඡ | U+0DA1 | 🟡 | ඡ (mahaprana of ච) = `chh` |
 | `j` | ජ | U+0DA2 | ✅ |  |
 | `jh` | ඣ | U+0DA3 | ✅ | aspirate |
 | `nnj` | ඦ | U+0DA6 | 🟡 | prenasalised |
@@ -136,7 +138,7 @@ Rules: ZWJ (U+200D) appears **only** directly after al-lakuna in the three conju
 | 1 | `sh` / `Sh` | `sh` = ශ, `Sh` = ෂ | UCSC converter: `sh` = ෂ |
 | 2 | `nnd` / `nndh` | `nnd` = ඳ, `nnD` = ඬ | UCSC converter: `nnd` = ඬ, `nndh` = ඳ |
 | 3 | `t` / `th` / `d` / `dh` | `t` ට, `th` ත, `d` ඩ, `dh` ද | Not compared against another table; confirm with the checklist in `verified_pairs.md` Part D |
-| 4 | `ch` | ඡ (plain `c` = ච) | UCSC converter also uses `ch` = ඡ (agrees) |
+| 4 | `ch` | ච (`chh` = ඡ) — changed 2026-11-26 on the user's instruction: "ච වදින්න ඕනෙ ch වලට" | UCSC converter uses `ch` = ඡ; most phone Singlish keyboards use `ch` = ච |
 | 5 | Anusvara | automatic before k / g / h, else `x` | Some schemes: only explicit |
 | 6 | `oo` | ඕ / ෝ | UCSC converter maps `oo` to ඌ / ූ (differs from my choice) |
 | 7 | Repaya | automatic on `r` + consonant | UCSC converter: explicit `\r` key |
