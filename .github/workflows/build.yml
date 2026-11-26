@@ -65,11 +65,13 @@ jobs:
       - name: Stage assets and build installer
         shell: pwsh
         run: |
+          $b64 = (Get-Content assets\sinhala_typer.ico.base64.a -Raw) + (Get-Content assets\sinhala_typer.ico.base64.b -Raw)
+          [IO.File]::WriteAllBytes("assets\sinhala_typer.ico", [Convert]::FromBase64String($b64))
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item target/release/sinhala_typer.exe dist/
           Copy-Item tsf/target/release/sinhala_typer_tsf.dll dist/
           $v = "${{ steps.ver.outputs.version }}"
-          makensis "/DVERSION=$v" "/DEXE=$((Resolve-Path dist/sinhala_typer.exe).Path)" "/DTSF=$((Resolve-Path dist/sinhala_typer_tsf.dll).Path)" installer/sinhala_typer.nsi
+          makensis "/DVERSION=$v" "/DEXE=$((Resolve-Path dist/sinhala_typer.exe).Path)" "/DTSF=$((Resolve-Path dist/sinhala_typer_tsf.dll).Path)" "/DICO=$((Resolve-Path assets/sinhala_typer.ico).Path)" installer/sinhala_typer.nsi
           Move-Item "installer/sinhala_typer-setup-$v.exe" dist/
           Get-ChildItem dist | Format-Table Name, Length
 
