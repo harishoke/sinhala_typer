@@ -1,91 +1,86 @@
-# sinhala_typer
+<div align="center">
 
-Lightweight, low-resource Windows 10/11 Sinhala phonetic (Singlish)
-typing utility in Rust. Global keyboard hook converts Singlish to Sinhala Unicode in
-real time, with an optional real-time legacy-font (FM Abhaya) mode for apps like
-MS Office. Minimal system tray UI plus an on-demand Settings & Info window.
+<img src="assets/icon.png" width="120" alt="Sinhala Typer icon">
 
+# Sinhala Typer
 
-## Highlights
+### Type Singlish. Get Sinhala. Anywhere on Windows.
 
-- **Case-sensitive phonetic engine** - `t`/`T`, `d`/`D`, `sh`/`Sh`, `Ru` and `H`
-  are different keys, typed exactly as you press them (Shift and Caps Lock aware).
-- **Shortcuts stay shortcuts** - Ctrl / Alt / Win combinations (copy, paste,
-  save, undo...) always pass through untouched; only the configured mode
-  hotkey is intercepted.
-- **Single instance** - a second launch exits instead of double-converting
-  every keystroke.
-- **Forgiving internals** - poison-safe shared state, atomic config saves
-  (a crash cannot truncate your settings), and a tray icon that shows the
-  current mode at a glance (amber dot = FM Abhaya, slate dot = English,
-  grey = off).
+**සිංග්ලිෂ් වලින් type කරන්න — සිංහල Unicode එවෙලේම.**
 
-## Status
+[![Latest release](https://img.shields.io/github/v/release/harishoke/sinhala_typer?style=for-the-badge)](https://github.com/harishoke/sinhala_typer/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/harishoke/sinhala_typer/total?style=for-the-badge)](https://github.com/harishoke/sinhala_typer/releases)
+![Windows 10 | 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=for-the-badge&logo=windows)
+![Built with Rust](https://img.shields.io/badge/Built%20with-Rust-dea584?style=for-the-badge&logo=rust)
 
-The app is feature-complete for a first usable release. The pure-Rust engine core
-(`src/engine/`) is platform-independent and fully tested anywhere: `phonetic.rs`
-(Singlish -> Sinhala Unicode, streaming with smart backspace) and `legacy.rs`
-(Unicode -> FM Abhaya + `render_diff`). The Windows-only modules (`src/win/`,
-`src/ui/`) are compiled only on Windows (`cfg(target_os = "windows")`) and provide:
+</div>
 
-- Global low-level keyboard hook (`WH_KEYBOARD_LL`) with injection guard
-- Real-time Singlish -> Sinhala conversion via `SendInput` (unicode + legacy
-  FM Abhaya rendering using `render_diff` screen tracking)
-- Configurable mode hotkey (default `ctrl+alt+s`, cycles English/Unicode/FM Abhaya)
-- Foreground-app detection to auto-switch to FM Abhaya in MS Office apps
-- System tray menu + settings window (eframe/egui), config persisted to TOML
-- Optional autostart via the `Run` registry key
-- Graceful degradation: if no GPU/OpenGL renderer is available (e.g. RDP or
-  headless sessions), the app logs the error and keeps running tray-only so
-  typing still works; a wgpu fallback renderer can be selected with
-  `SINHALA_TYPER_RENDERER=wgpu`
+---
 
-Settings live in `%APPDATA%\sinhala_typer\settings.toml`.
+## ⬇️ Download
 
-## Layout
+| | |
+| :--- | :--- |
+| **Installer (recommended)** | [sinhala_typer-setup-1.2.0.exe](https://github.com/harishoke/sinhala_typer/releases/download/v1.2.0/sinhala_typer-setup-1.2.0.exe) — per-user install, no admin needed |
+| **Portable** | [sinhala_typer.exe](https://github.com/harishoke/sinhala_typer/releases/download/v1.2.0/sinhala_typer.exe) — single file, just run it |
 
-- `src/engine/` — pure-Rust typing engines: `phonetic.rs` (Singlish -> Unicode),
-  `legacy.rs` (Unicode -> FM Abhaya + `render_diff`), `mod.rs` (shared types:
-  `Mode`, `EditAction`, test-only `ScreenSim`)
-- `src/win/` — Windows-only: keyboard hook, synthesized input, foreground-app
-  detection, autostart registry
-- `src/ui/` — Windows-only: tray icon/menu, settings window
-- `src/config.rs` — cross-platform settings/hotkey parsing (tested anywhere)
-- `src/state.rs` — shared app state and per-process mode selection (tested anywhere)
-- `data/` — owner-verified linguistic data (keymap, FM Abhaya table, test pairs).
-  These files are owned by the product owner; no AI may invent their contents.
-- `assets/` — the app icon, stored as base64 text
-  (`sinhala_typer.ico.base64.a`/`.b`) so the repository stays text-only: `build.rs`
-  decodes it and embeds it into the .exe, and CI materialises the `.ico`
-  for the installer. The tray/window artwork lives as generated RGBA
-  tables in `src/ui/tray_art.rs` (amber dot = FM Abhaya, slate dot =
-  English, grey = off).
+The app starts **silently in the system tray**. Right-click the tray icon for modes and **Settings...**, or double-click it. Press **Ctrl+Alt+S** anywhere to cycle modes.
 
-## Build & install
+## ✨ Features
 
-Continuous integration (`.github/workflows/build.yml`) runs the engine test
-suite, builds the optimized Windows binary, smoke-tests it, and produces a
-signed-ready Inno Setup installer (`dist/sinhala_typer-setup-<version>.exe`):
+- **Real-time phonetic conversion** — type `ammaa` and watch අම්මා appear, letter by letter, in any app.
+- **Three modes** — English (pass-through) · Sinhala (Unicode) · Sinhala (FM Abhaya) for legacy-font MS Office documents.
+- **Smart about your shortcuts** — Ctrl / Alt / Win combos (copy, paste, save…) always pass through untouched.
+- **Works *with* the Windows language bar** — if a window is on a Sinhala layout you picked in Windows (Win+Space), Sinhala Typer pauses there automatically instead of converting twice.
+- **FM Abhaya done right** — correct legacy rendering in Word/Excel/PowerPoint (auto-detected), including real punctuation, which the FM font normally turns into letters.
+- **Case-sensitive keys** — `t`/`T`, `d`/`D`, `sh`/`Sh`, `Ru`/`Ruu`, `H` are different letters, honoring Shift and Caps Lock.
+- **Featherweight** — ~10–15 MB RAM, ~0% idle CPU, single instance, starts with Windows if you want it to.
+- **Optional mode-change notifications** and a clean, dark Settings UI.
 
-- every push/PR: binaries + installer are uploaded as workflow artifacts
-- every tag `v*`: a draft GitHub Release is created with the portable `.exe`
-  and the setup installer attached
+## ⌨️ How to type
 
-To build locally on Windows: `cargo build --release` produces the binary and
-`iscc installer/sinhala_typer.iss` (Inno Setup 6) builds the installer.
+Just type the Singlish spelling — the engine handles conjuncts (ක්‍ර, ද්‍ය, ර්‍ම), anusvara and long vowels for you:
 
-- `cargo check` — fast compile check
-- `cargo test` — engine unit tests (runs on any OS)
-- `cargo run` — run the app (Windows)
-- `cargo build --release` — optimized binary in `target/release/`
+| You type | You get | | You type | You get |
+| :--- | :--- | :--- | :--- | :--- |
+| `ammaa` | අම්මා | | `sangha` | සංඝ |
+| `lankaava` | ලංකාව | | `punchi` | පුංචි |
+| `krama` | ක්‍රම | | `vidhyaava` | විද්‍යාව |
+| `kohomadha` | කොහොමද | | `aayuboowan` | ආයුබෝවන් |
 
-## Resource targets
+Handy keys: `ch` = ච · `chh` = ඡ · `kh` = ඛ · `gh` = ඝ · `Th` = ථ · `Dh` = ධ · `sh` = ශ · `Sh` = ෂ · `Ru` = ඍ · `Ruu` = ඎ · `x` = ං · `H` = ඃ. Full table: [data/keymap.md](data/keymap.md).
 
-Background tray process: ~10-15 MB RAM, ~0% idle CPU, tiny release binary
-(`opt-level = "z"`, LTO, stripped).
+## 🔧 Under the hood
 
-## Credits
+The pure-Rust engine core (`src/engine/`) is platform-independent and fully tested (30 unit tests): `phonetic.rs` (Singlish → Sinhala Unicode, streaming with smart backspace) and `legacy.rs` (Unicode → FM Abhaya with `render_diff` screen tracking). The Windows-only modules (`src/win/`, `src/ui/`) provide:
+
+- Global low-level keyboard hook (`WH_KEYBOARD_LL`) with an injection guard
+- Real-time conversion via `SendInput`, foreground-app detection for Office, and Sinhala-layout detection for language-bar coexistence
+- System tray menu + settings window (eframe/egui); config in `%APPDATA%\sinhala_typer\settings.toml` (atomic saves; a corrupt config is backed up, never silently wiped)
+- Graceful degradation: no GPU/OpenGL (RDP, headless)? The app keeps running tray-only so typing still works; a wgpu fallback can be selected with `SINHALA_TYPER_RENDERER=wgpu`
+
+## 📁 Layout
+
+- `src/engine/` — typing engines and shared types (`Mode`, `EditAction`)
+- `src/win/` — keyboard hook, synthesized input, foreground/layout detection, autostart, notifications
+- `src/ui/` — tray icon/menu, settings window
+- `src/config.rs`, `src/state.rs` — settings/hotkey parsing and per-process mode selection (tested anywhere)
+- `data/` — verified linguistic data (keymap, FM Abhaya table, test pairs)
+- `assets/` — app icon; the `.ico` is stored as base64 text (`sinhala_typer.ico.base64.a`/`.b`) so the repo stays text-only — `build.rs` decodes and embeds it, and tray/window artwork lives as generated RGBA tables in `src/ui/`
+
+## 🛠️ Build
+
+```sh
+cargo test            # engine unit tests (any OS)
+cargo build --release # optimized binary (Windows)
+```
+
+CI (`.github/workflows/build.yml`) runs the test suite, builds the Windows binary and produces the Inno Setup installer (`installer/sinhala_typer.iss`); tags `v*` create a draft release with both downloads attached. Release profile: `opt-level = "z"`, LTO, stripped.
+
+## 👤 Credits
 
 Created by **Ashen Nethsara** —
 [LinkedIn](https://www.linkedin.com/in/ashennethsara/) ·
 [GitHub](https://github.com/AshenNethsara/)
+
+FM Abhaya mapping data derives from the MIT-licensed [Pandukabhaya](https://github.com/akuruAI/Pandukabhaya) project. The FM Abhaya *font* itself is proprietary — install your own licensed copy to use legacy mode.
