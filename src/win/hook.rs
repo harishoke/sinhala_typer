@@ -5,7 +5,7 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use crate::config::Hotkey;
-use crate::engine::legacy::render_diff;
+use crate::engine::legacy::{fm_punctuation, render_diff};
 use crate::engine::phonetic::PhoneticEngine;
 use crate::engine::{EditAction, Mode};
 use crate::state::{lock_read, lock_write, SharedState};
@@ -37,6 +37,8 @@ struct HookCtx {
     win: bool,
     fg_cache: Option<(Instant, Option<String>)>,
     last_fg: Option<String>,
+    layout_cache: Option<(Instant, bool)>,
+    last_sinhala_layout: bool,
 }
 
 thread_local! {
@@ -56,6 +58,8 @@ impl HookCtx {
             win: false,
             fg_cache: None,
             last_fg: None,
+            layout_cache: None,
+            last_sinhala_layout: false,
         }
     }
 
@@ -82,13 +86,23 @@ impl HookCtx {
     }
 
     fn cycle_mode(&mut self) {
-        let mut st = lock_write(&self.state);
-        st.config.mode = match st.config.mode {
-            Mode::English => Mode::Unicode,
-            Mode::Unicode => Mode::LegacyFm,
-            Mode::LegacyFm => Mode::English,
+        let (mode, enabled, notify) = {
+            let mut st = lock_write(&self.state);
+            st.config.mode = match st.config.mode {
+                Mode::English => Mode::Unicode,
+                Mode::Unicode => Mode::LegacyFm,
+                Mode::LegacyFm => Mode::English,
+            };
+            let _ = st.config.save();
+            (
+                st.config.mode,
+                st.config.enabled,
+                st.config.notifications,
+            )
         };
-        let _ = st.config.save();
+        if notify {
+            super::notify::mode_changed(mode, enabled);
+        }
     }
 
     fn fg_name(&mut self) -> Option<String> {
@@ -107,7 +121,41 @@ impl HookCtx {
         }
     }
 
+    fn sinhala_layout(&mut self) -> bool {
+        let cached = self
+            .layout_cache
+            .as_ref()
+            .filter(|(t, _)| t.elapsed() < Duration::from_millis(750))
+            .map(|(_, b)| *b);
+        match cached {
+            Some(b) => b,
+            None => {
+                let b = super::fg::foreground_is_sinhala_layout();
+                self.layout_cache = Some((Instant::now(), b));
+                b
+            }
+        }
+    }
+
     fn effective_mode(&mut self) -> Mode {
+        // Coexist with the Windows language bar: when the foreground window
+        // is on a Sinhala layout the user picked in Windows (Win+Space),
+        // Windows itself converts the keystrokes, so pass through untouched
+        // until they switch the layout back.
+        let (enabled, configured) = {
+            let st = lock_read(&self.state);
+            (st.config.enabled, st.config.mode)
+        };
+        if enabled && configured != Mode::English {
+            let sl = self.sinhala_layout();
+            if sl != self.last_sinhala_layout {
+                self.last_sinhala_layout = sl;
+                self.reset_buffers();
+            }
+            if sl {
+                return Mode::English;
+            }
+        }
         let needs_fg = {
             let st = lock_read(&self.state);
             st.config.enabled
@@ -211,9 +259,66 @@ impl HookCtx {
             }
             return false;
         }
+        if mode == Mode::LegacyFm {
+            // In the FM Abhaya font the punctuation slots draw Sinhala
+            // glyphs, so a raw `,` / `.` / `?` would appear as a letter.
+            // Substitute the character whose FM glyph is the wanted mark.
+            if let Some(c) = punct_char(vk, self.shift) {
+                self.reset_buffers();
+                if let Some(fm) = fm_punctuation(c) {
+                    super::input::apply_edit(&EditAction {
+                        backspaces: 0,
+                        insert: fm.to_string(),
+                    });
+                    return true;
+                }
+                return false;
+            }
+        }
         self.reset_buffers();
         false
     }
+}
+
+/// The character a US-layout key produces, for the punctuation / symbol
+/// keys the letter branch does not cover. Letters are handled separately
+/// (case rules), digits without Shift pass through as digits.
+fn punct_char(vk: u32, shift: bool) -> Option<char> {
+    Some(match (vk, shift) {
+        (0xBA, false) => ';',
+        (0xBA, true) => ':',
+        (0xBB, false) => '=',
+        (0xBB, true) => '+',
+        (0xBC, false) => ',',
+        (0xBC, true) => '<',
+        (0xBD, false) => '-',
+        (0xBD, true) => '_',
+        (0xBE, false) => '.',
+        (0xBE, true) => '>',
+        (0xBF, false) => '/',
+        (0xBF, true) => '?',
+        (0xC0, false) => '`',
+        (0xC0, true) => '~',
+        (0xDB, false) => '[',
+        (0xDB, true) => '{',
+        (0xDC, false) => '\\',
+        (0xDC, true) => '|',
+        (0xDD, false) => ']',
+        (0xDD, true) => '}',
+        (0xDE, false) => '\'',
+        (0xDE, true) => '"',
+        (0x30, true) => ')',
+        (0x31, true) => '!',
+        (0x32, true) => '@',
+        (0x33, true) => '#',
+        (0x34, true) => '$',
+        (0x35, true) => '%',
+        (0x36, true) => '^',
+        (0x37, true) => '&',
+        (0x38, true) => '*',
+        (0x39, true) => '(',
+        _ => return None,
+    })
 }
 
 fn char_to_vk(c: char) -> u32 {
