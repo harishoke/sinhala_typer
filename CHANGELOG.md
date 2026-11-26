@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.2.0
+
+### Fixed
+- **`ch` now types ච** (it produced ඡ before, so words like `punchi` came
+  out wrong). The aspirated ඡ moved to `chh`. Plain `c` still gives ච.
+- **Aspirated (mahaprana) letters and anusvara placement.** A plain `n`
+  before an aspirated or palatal consonant now becomes anusvara as it
+  should: `sangha` → සංඝ, `sancaara` → සංචාර, `punchi` → පුංචි (previously
+  only before `k`, `g`, `h`).
+- **Long vocalic vowels (දීර්ඝ) can be typed.** `Ruu` now gives ඎ, and after
+  a consonant the long sign ෲ (`kRuu` → කෲ). Previously `Ruu` produced the
+  broken sequence ඍඋ.
+- **Punctuation in FM Abhaya mode.** In the FM font the ASCII punctuation
+  slots draw Sinhala glyphs, so `,` `.` `?` and friends appeared as
+  letters. FM mode now substitutes the character whose FM Abhaya glyph is
+  the wanted mark (mapping inverted from the Pandukabhaya FM table).
+
+### Added
+- **Silent start.** The app now starts hidden in the system tray; the
+  Settings window no longer appears at launch. Closing Settings hides it
+  to the tray instead of quitting the app; reopen it from the tray icon's
+  right-click menu ("Settings...") or by double-clicking the icon.
+- **Optional mode-change notifications** (off by default): a tray-menu or
+  Settings toggle shows a toast whenever the typing mode changes.
+- **Windows language bar coexistence.** When the foreground window uses a
+  Sinhala layout selected in Windows (Win+Space / language bar), Sinhala
+  Typer pauses there automatically so keystrokes are not converted twice;
+  switch the layout back to English and Sinhala Typer resumes. The mode
+  hotkey still cycles English / Sinhala Unicode / Sinhala FM Abhaya at any
+  time.
+- **Refreshed Settings UI** with a header card, mode cards and an About
+  section crediting the creator, Ashen Nethsara.
+
 ## 1.1.0
 
 ### Fixed
