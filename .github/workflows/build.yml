@@ -1,0 +1,104 @@
+name: Build & Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (must match Cargo.toml, e.g. 2.0.0)"
+        required: true
+        default: "2.0.0"
+      release:
+        description: "Publish a GitHub release with the built assets"
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $v = "${{ github.ref_name }}".TrimStart("v")
+          } else {
+            $v = "${{ inputs.version }}"
+          }
+          $cargo = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          if ($v -ne $cargo) {
+            Write-Error "Requested version $v does not match Cargo.toml ($cargo)"
+            exit 1
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Building version $v"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Test engine
+        run: cargo test -p sinhala_engine
+
+      - name: Test app
+        run: cargo test
+
+      - name: Build companion app
+        run: cargo build --release
+
+      - name: Build TSF text service
+        working-directory: tsf
+        run: cargo build --release
+
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
+
+      - name: Stage assets and build installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target/release/sinhala_typer.exe dist/
+          Copy-Item tsf/target/release/sinhala_typer_tsf.dll dist/
+          $v = "${{ steps.ver.outputs.version }}"
+          makensis "/DVERSION=$v" "/DEXE=$((Resolve-Path dist/sinhala_typer.exe).Path)" "/DTSF=$((Resolve-Path dist/sinhala_typer_tsf.dll).Path)" installer/sinhala_typer.nsi
+          Move-Item "installer/sinhala_typer-setup-$v.exe" dist/
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sinhala_typer-${{ steps.ver.outputs.version }}
+          path: dist/*
+
+      - name: Publish release
+        if: ${{ github.ref_type == 'tag' || inputs.release }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = "${{ steps.ver.outputs.version }}"
+          $notes = "release-notes-v$v.md"
+          $assets = @(
+            "dist/sinhala_typer-setup-$v.exe",
+            "dist/sinhala_typer.exe",
+            "dist/sinhala_typer_tsf.dll"
+          )
+          $title = "Sinhala Typer $v"
+          gh release view "v$v" --json tagName 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload "v$v" $assets --clobber
+            gh release edit "v$v" --title $title --latest
+          } elseif (Test-Path $notes) {
+            gh release create "v$v" $assets --title $title --notes-file $notes --latest
+          } else {
+            gh release create "v$v" $assets --title $title --generate-notes --latest
+          }
