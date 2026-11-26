@@ -1,8 +1,6 @@
-; Sinhala Typer installer (NSIS) - Linux-buildable equivalent of the
-; Inno Setup script (sinhala_typer.iss). The GitHub Actions pipeline uses
-; the Inno script; this one produces the same install layout and is used
-; for local / cross-built releases.
-; Build: makensis /DVERSION=1.3.0 /DEXE=<path to sinhala_typer.exe> /DTSF=<path to sinhala_typer_tsf.dll> sinhala_typer.nsi
+; Sinhala Typer installer (NSIS). Used by the GitHub Actions pipeline
+; (.github/workflows/build.yml) and for local builds.
+; Build: makensis /DVERSION=2.0.0 /DEXE=<path to sinhala_typer.exe> /DTSF=<path to sinhala_typer_tsf.dll> /DICO=<path to sinhala_typer.ico> sinhala_typer.nsi
 
 !ifndef VERSION
   !define VERSION "2.0.0"
