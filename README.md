@@ -21,23 +21,20 @@
 
 | | |
 | :--- | :--- |
-| **Installer (recommended)** | [sinhala_typer-setup-1.3.0.exe](https://github.com/harishoke/sinhala_typer/releases/download/v1.3.0/sinhala_typer-setup-1.3.0.exe) — per-user install, no admin needed |
-| **Portable** | [sinhala_typer.exe](https://github.com/harishoke/sinhala_typer/releases/download/v1.3.0/sinhala_typer.exe) — single file, just run it |
+| **Installer (recommended)** | [sinhala_typer-setup-2.0.0.exe](https://github.com/harishoke/sinhala_typer/releases/download/v2.0.0/sinhala_typer-setup-2.0.0.exe) — per-user install, no admin needed |
+| **Portable** | [sinhala_typer.exe](https://github.com/harishoke/sinhala_typer/releases/download/v2.0.0/sinhala_typer.exe) — single file, just run it |
 
-The app starts **silently in the system tray**. Right-click the tray icon for modes and **Settings...**, or double-click it. Press **Ctrl+Alt+S** anywhere to cycle modes.
+**Setup (once):** install, open **Settings...** from the tray icon, click **Add the Windows keyboards** (one admin prompt), then add **Sinhala Typer (Unicode)** and/or **Sinhala Typer (FM Abhaya)** under Windows Settings → Time & language → Language → **Sinhala** → Keyboards. From then on, switch keyboards with **Win+Space** like any other language — typing works in every app, even with the companion app closed. The tray app only handles settings and updates.
 
 ## ✨ Features
 
-- **Real-time phonetic conversion** — type `ammaa` and watch අම්මා appear, letter by letter, in any app.
-- **Three modes** — English (pass-through) · Sinhala (Unicode) · Sinhala (FM Abhaya) for legacy-font MS Office documents.
+- **Real Windows keyboards** — Sinhala Typer (Unicode) and Sinhala Typer (FM Abhaya) are genuine TSF keyboards under the Sinhala language. Conversion happens inside the text service, in the app you're typing in — no global hook, no companion process needed.
+- **Real-time phonetic conversion** — type `ammaa` and watch අම්මා appear, letter by letter, as a proper IME composition you can backspace through.
+- **The standard phonetic layout** — doubled vowels are long (`aa` = ආ), capitals give retroflex letters (`Ta` = ඨ, `Na` = ණ, `La` = ළ), `z` gives the naasikya letters (`zga` = ඟ), and the dental aspirates take a double h (`thha` = ථ, `dhha` = ධ). Full table: [data/keymap.md](data/keymap.md).
+- **FM Abhaya done right** — the FM keyboard renders correct legacy glyphs in MS Office, including real punctuation, which the FM font normally turns into letters. (Set the document font to FM Abhaya.)
 - **Smart about your shortcuts** — Ctrl / Alt / Win combos (copy, paste, save…) always pass through untouched.
-- **Works *with* the Windows language bar** — if a window is on a Sinhala layout you picked in Windows (Win+Space), Sinhala Typer pauses there automatically instead of converting twice.
-- **FM Abhaya done right** — correct legacy rendering in Word/Excel/PowerPoint (auto-detected), including real punctuation, which the FM font normally turns into letters.
-- **Case-sensitive keys** — `t`/`T`, `d`/`D`, `sh`/`Sh`, `Ru`/`Ruu`, `H` are different letters, honoring Shift and Caps Lock.
-- **Featherweight** — ~10–15 MB RAM, ~0% idle CPU, single instance, starts with Windows if you want it to.
-- **Real Windows keyboards** — optionally register Sinhala Typer (Unicode) and Sinhala Typer (FM Abhaya) as two keyboards under the Sinhala language (Settings → Windows keyboards, one admin prompt). Win+Space then switches typing modes like any other keyboard.
 - **In-app updates** — Settings → Updates checks for new versions and can download & install them in one click.
-- **Optional mode-change notifications** and a clean, dark Settings UI.
+- **Featherweight companion** — the tray app uses a few MB of RAM, starts with Windows if you want it to, and is only needed for settings/updates.
 
 ## ⌨️ How to type
 
@@ -50,35 +47,32 @@ Just type the Singlish spelling — the engine handles conjuncts (ක්‍ර, 
 | `krama` | ක්‍රම | | `vidhyaava` | විද්‍යාව |
 | `kohomadha` | කොහොමද | | `aayuboowan` | ආයුබෝවන් |
 
-Handy keys: `ch` = ච · `chh` = ඡ · `kh` = ඛ · `gh` = ඝ · `Th` = ථ · `Dh` = ධ · `sh` = ශ · `Sh` = ෂ · `Ru` = ඍ · `Ruu` = ඎ · `x` = ං · `H` = ඃ. Full table: [data/keymap.md](data/keymap.md).
+Handy keys: `ch` = ච · `chh` = ඡ · `kh` = ඛ · `gh` = ඝ · `tha` = ත · `thha` = ථ · `dha` = ද · `dhha` = ධ · `Ta` = ඨ · `Da` = ඪ · `sha` = ශ · `Sa`/`Sha` = ෂ · `R` = ඍ · `Ru` = ඎ · `kru` = කෘ · `kruu` = කෲ · `x` = ං · `H` = ඃ. Full table: [data/keymap.md](data/keymap.md).
 
 ## 🔧 Under the hood
 
-The pure-Rust engine core (`src/engine/`) is platform-independent and fully tested (30 unit tests): `phonetic.rs` (Singlish → Sinhala Unicode, streaming with smart backspace) and `legacy.rs` (Unicode → FM Abhaya with `render_diff` screen tracking). The Windows-only modules (`src/win/`, `src/ui/`) provide:
-
-- Global low-level keyboard hook (`WH_KEYBOARD_LL`) with an injection guard
-- Real-time conversion via `SendInput`, foreground-app detection for Office, and Sinhala-layout detection for language-bar coexistence
-- System tray menu + settings window (eframe/egui); config in `%APPDATA%\sinhala_typer\settings.toml` (atomic saves; a corrupt config is backed up, never silently wiped)
-- Graceful degradation: no GPU/OpenGL (RDP, headless)? The app keeps running tray-only so typing still works; a wgpu fallback can be selected with `SINHALA_TYPER_RENDERER=wgpu`
+- `engine/` — the shared, platform-independent Rust crate with the conversion engines: `phonetic.rs` (Singlish → Sinhala Unicode) and `legacy.rs` (Unicode → FM Abhaya). Fully unit-tested, including every row of the adopted phonetic spec.
+- `tsf/` — the TSF text service (IME) DLL: advises a key-event sink, feeds keystrokes to the engine, and maintains a composition in the focused document. Registers the two keyboards under si-LK.
+- `src/` — the companion tray app (settings window in a separate `--settings` process, autostart, notifications, TSF registration, in-app updates). Config lives in `%APPDATA%\sinhala_typer\settings.toml`.
 
 ## 📁 Layout
 
-- `src/engine/` — typing engines and shared types (`Mode`, `EditAction`)
-- `src/win/` — keyboard hook, synthesized input, foreground/layout detection, autostart, notifications, TSF registration, in-app updates
-- `tsf/` — companion TSF text-service DLL registering the two Windows keyboards
+- `engine/` — shared typing engines (used by the app and the TSF service)
+- `tsf/` — TSF text-service DLL (the two Windows keyboards)
+- `src/win/` — autostart, notifications, tray message pump, TSF registration, in-app updates
 - `src/ui/` — tray icon/menu, settings window
-- `src/config.rs`, `src/state.rs` — settings/hotkey parsing and per-process mode selection (tested anywhere)
-- `data/` — verified linguistic data (keymap, FM Abhaya table, test pairs)
-- `assets/` — app icon; the `.ico` is stored as base64 text (`sinhala_typer.ico.base64.a`/`.b`) so the repo stays text-only — `build.rs` decodes and embeds it, and tray/window artwork lives as generated RGBA tables in `src/ui/`
+- `data/` — linguistic data (keymap spec, FM Abhaya table)
+- `assets/` — app icon; the `.ico` is stored as base64 text (`sinhala_typer.ico.base64.a`/`.b`) so the repo stays text-only — `build.rs` decodes and embeds it
 
 ## 🛠️ Build
 
 ```sh
-cargo test            # engine unit tests (any OS)
-cargo build --release # optimized binary (Windows)
+cargo test -p sinhala_engine   # engine unit tests (any OS)
+cargo build --release          # companion app (Windows)
+cargo build --release --manifest-path tsf/Cargo.toml   # TSF service (Windows)
 ```
 
-CI (`.github/workflows/build.yml`) runs the test suite, builds the Windows binary and produces the Inno Setup installer (`installer/sinhala_typer.iss`); tags `v*` create a draft release with both downloads attached. Release profile: `opt-level = "z"`, LTO, stripped.
+Releases are built by GitHub Actions on a Windows runner (`.github/workflows/build.yml`): tests, both binaries, the NSIS installer (`installer/sinhala_typer.nsi`), and the GitHub release.
 
 ## 👤 Credits
 

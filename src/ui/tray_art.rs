@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Generated tray/window artwork (RGBA, row-major). Do not edit by hand.
 //! Source artwork: `assets/icon.png`; regenerate from the .rgba files in git history if the icon changes.
 

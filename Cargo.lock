@@ -3338,14 +3338,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
+name = "sinhala_engine"
+version = "2.0.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "sinhala_typer"
-version = "1.3.0"
+version = "2.0.0"
 dependencies = [
  "eframe",
  "muda",
  "notify-rust",
  "serde",
  "serde_json",
+ "sinhala_engine",
  "toml 0.8.2",
  "tray-icon",
  "ureq",

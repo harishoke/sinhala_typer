@@ -5,7 +5,7 @@
 ; Build: makensis /DVERSION=1.3.0 /DEXE=<path to sinhala_typer.exe> /DTSF=<path to sinhala_typer_tsf.dll> sinhala_typer.nsi
 
 !ifndef VERSION
-  !define VERSION "1.3.0"
+  !define VERSION "2.0.0"
 !endif
 !ifndef EXE
   !define EXE "..\target\x86_64-pc-windows-gnu\release\sinhala_typer.exe"

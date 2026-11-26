@@ -1,14 +1,15 @@
 [package]
 name = "sinhala_typer_tsf"
-version = "1.3.0"
+version = "2.0.0"
 edition = "2021"
-description = "TSF text service that registers Sinhala Typer as two Windows keyboards (Unicode / FM Abhaya) under the Sinhala language."
+description = "TSF text service (IME) that provides Sinhala Typer as two Windows keyboards (Unicode / FM Abhaya) under the Sinhala language."
 license = "MIT"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
+sinhala_engine = { path = "../engine" }
 windows-core = "0.58"
 windows = { version = "0.58", features = [
     "implement",

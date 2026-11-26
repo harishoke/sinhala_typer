@@ -1,5 +1,45 @@
 # Changelog
 
+## 2.0.0 — 2026-11-26
+
+A ground-up rework of how Sinhala Typer integrates with Windows, driven
+by 1.3.0 field reports (the app flashed a window at launch and typing
+behaved unreliably outside the tray app's own model).
+
+### Changed — a real Windows IME
+- Typing now happens **inside a TSF text service**, not a global
+  keyboard hook. The two keyboards — **Sinhala Typer (Unicode)** and
+  **Sinhala Typer (FM Abhaya)** — are genuine Windows keyboards under
+  the Sinhala language: add them once in Windows Settings, switch with
+  Win+Space, and type in any app. The companion exe no longer needs to
+  be running to type.
+- The companion app is now **tray-only** (Settings opens in its own
+  process when asked). There is no hidden window to flash at startup,
+  and tray Exit is a direct process exit — the v1.2.0/1.3.0 exit bug
+  class is gone by construction.
+- Modes, the mode hotkey, and per-app FM switching are gone: the
+  Windows keyboard you pick *is* the mode.
+
+### Changed — keymap
+- The phonetic layout now follows the standard ශබ්දානුකූල (phonetic)
+  scheme the owner adopted (see `data/keymap.md`): `tha` = ත,
+  `dha`/`qa` = ද, `thha` = ථ, `dhha` = ධ, `Ta` = ඨ, `Da` = ඪ,
+  capitals for retroflex letters (`Na` = ණ, `La` = ළ, `Sa`/`Sha` = ෂ),
+  `z` prefixes for the naasikya letters (`zga` = ඟ, `zja` = ඦ,
+  `zda` = ඬ, `zdha` = ඳ, `zka` = ඤ, `zha` = ඥ), `Ba` = ඹ, `A` = ඇ,
+  `Aa` = ඈ, `R` = ඍ, `Ru` = ඎ, `kru` = කෘ, `kruu` = කෲ, `kax` = කං,
+  `kaX` = කඞ. `ch` still types ච (owner decision). The convenient
+  automatic ං before velar/palatal consonants is kept
+  (`sangha` → සංඝ, `punchi` → පුංචි).
+
+### Engineering
+- The conversion engines moved into a shared crate (`engine/`) used by
+  both the app and the TSF service, with the full spec table covered by
+  unit tests.
+- Builds and releases are produced by GitHub Actions on a Windows
+  runner (`.github/workflows/build.yml`).
+
+
 ## 1.3.0 — 2026-11-26
 
 ### Fixed (reported against 1.2.0)

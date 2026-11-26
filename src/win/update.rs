@@ -4,8 +4,7 @@
 
 use std::sync::Mutex;
 
-const LATEST_API: &str =
-    "https://api.github.com/repos/harishoke/sinhala_typer/releases/latest";
+const LATEST_API: &str = "https://api.github.com/repos/harishoke/sinhala_typer/releases/latest";
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum UpdateState {
@@ -45,9 +44,7 @@ pub fn check_latest() -> Result<Option<String>, String> {
         .set("User-Agent", "SinhalaTyper")
         .call()
         .map_err(|e| format!("network error: {e}"))?;
-    let body: serde_json::Value = resp
-        .into_json()
-        .map_err(|e| format!("bad response: {e}"))?;
+    let body: serde_json::Value = resp.into_json().map_err(|e| format!("bad response: {e}"))?;
     let tag = body
         .get("tag_name")
         .and_then(|t| t.as_str())
@@ -97,7 +94,6 @@ pub fn start_install(version: String) {
         match result {
             Ok(path) => {
                 let _ = std::process::Command::new(&path).spawn();
-                crate::ui::request_exit();
                 std::process::exit(0);
             }
             Err(e) => set(UpdateState::Error(e)),

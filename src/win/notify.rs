@@ -1,31 +1,7 @@
-use crate::engine::Mode;
+use notify_rust::Notification;
 
-/// Optional toast when the typing mode changes (Settings -> "Notify me when
-/// the mode changes", off by default). Shown from a helper thread so neither
-/// the keyboard hook nor the UI ever blocks on the notification service.
-pub fn mode_changed(mode: Mode, enabled: bool) {
-    let body = if !enabled {
-        "Typing is off".to_string()
-    } else {
-        match mode {
-            Mode::English => "English (pass-through)",
-            Mode::Unicode => "Sinhala (Unicode)",
-            Mode::LegacyFm => "Sinhala (FM Abhaya)",
-        }
-        .to_string()
-    };
-    show("Sinhala Typer", &body);
-}
-
-/// Show a toast with an explicit title/body, from a helper thread.
+/// Show a desktop toast. Best-effort: failures are ignored so a missing
+/// notification service never disturbs typing.
 pub fn show(title: &str, body: &str) {
-    let title = title.to_string();
-    let body = body.to_string();
-    std::thread::spawn(move || {
-        let _ = notify_rust::Notification::new()
-            .appname("Sinhala Typer")
-            .summary(&title)
-            .body(&body)
-            .show();
-    });
+    let _ = Notification::new().summary(title).body(body).show();
 }

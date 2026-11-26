@@ -1,8 +1,8 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use crate::engine::Mode;
 use serde::{Deserialize, Serialize};
+use sinhala_engine::Mode;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hotkey {
@@ -40,6 +40,7 @@ impl fmt::Display for Hotkey {
     }
 }
 
+#[allow(dead_code)]
 impl Hotkey {
     pub fn parse(s: &str) -> Result<Hotkey, String> {
         let mut hk = Hotkey {
@@ -172,6 +173,7 @@ impl Config {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn hotkey(&self) -> Hotkey {
         Hotkey::parse(&self.hotkey).unwrap_or_default()
     }

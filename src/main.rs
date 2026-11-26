@@ -1,115 +1,107 @@
-#![cfg_attr(not(target_os = "windows"), allow(dead_code))]
-// Release builds are a tray app: no console window flashing up at login.
 #![cfg_attr(
     all(target_os = "windows", not(debug_assertions)),
     windows_subsystem = "windows"
 )]
+#![cfg_attr(not(target_os = "windows"), allow(dead_code))]
 
 mod config;
-mod engine;
 mod state;
-
 #[cfg(target_os = "windows")]
 mod ui;
 #[cfg(target_os = "windows")]
 mod win;
 
+#[cfg(not(target_os = "windows"))]
+fn main() {
+    eprintln!("Sinhala Typer is a Windows application.");
+}
+
+/// v2 architecture: typing lives entirely in the TSF text service
+/// (`sinhala_typer_tsf.dll`), which Windows loads into every app when one
+/// of our keyboards is active. This executable is only a companion:
+///
+/// - default: a tray-only process (no window at all — it cannot flash on
+///   screen the way the v1.x settings window could, and Exit is a plain
+///   `process::exit`, which cannot be blocked by a close handler);
+/// - `--settings`: the Settings window in its own process, where closing
+///   the window simply ends that process.
 #[cfg(target_os = "windows")]
 fn main() {
-    // Single instance: two copies would install two keyboard hooks and
-    // convert every keystroke twice. Hold the mutex for the process life.
-    let _single_instance = match win::single_instance::acquire() {
-        Some(guard) => guard,
-        None => {
-            eprintln!("sinhala_typer: already running; exiting");
-            return;
-        }
+    if std::env::args().any(|a| a == "--settings") {
+        run_settings();
+    } else {
+        run_companion();
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn run_companion() {
+    let Some(_instance) = win::single_instance::acquire() else {
+        return; // already running
     };
-
-    let cfg = config::Config::load();
-    let state = state::shared_state(cfg);
-
-    // Reconcile the saved autostart preference with the registry, and only
-    // rewrite the config file when something actually changed (the old code
-    // rewrote it on every launch).
+    let config = config::Config::load();
+    let state = state::shared_state(config);
     {
-        let mut st = state::lock_write(&state);
-        let registered = win::autostart::is_enabled();
-        if st.config.autostart != registered {
-            if win::autostart::set_autostart(st.config.autostart) {
-                // registry now matches the saved preference; nothing to save
-            } else {
-                st.config.autostart = win::autostart::is_enabled();
-                if let Err(err) = st.config.save() {
-                    eprintln!("sinhala_typer: could not save config: {err}");
-                }
-            }
+        let cfg = state::lock_read(&state).config.clone();
+        if cfg.autostart {
+            let _ = win::autostart::set_autostart(true);
         }
     }
-
-    let hook_state = state.clone();
-    win::hook::spawn(hook_state);
-
-    if let Err(err) = ui::init_tray(&state) {
-        eprintln!("sinhala_typer: tray unavailable: {err}");
+    if let Err(e) = ui::init_tray(&state) {
+        eprintln!("tray init failed: {e}");
     }
-
-    // One silent update check per launch: a toast only if a newer release
-    // exists and the user opted into notifications. Installing is a
-    // deliberate click in Settings -> Updates.
+    // One silent update check shortly after launch; toast only when an
+    // update exists and notifications are on.
     {
-        let state2 = state.clone();
+        let st = state.clone();
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_secs(8));
-            if let Ok(Some(v)) = win::update::check_latest() {
-                if state::lock_read(&state2).config.notifications {
-                    win::notify::show(
-                        "Sinhala Typer update",
-                        &format!(
-                            "Version {v} is available — open Settings, Updates to install it."
-                        ),
-                    );
+            win::update::start_check();
+            for _ in 0..40 {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                match win::update::state() {
+                    win::update::UpdateState::Available(v) => {
+                        if state::lock_read(&st).config.notifications {
+                            win::notify::show(
+                                "Sinhala Typer update",
+                                &format!(
+                                    "Version {v} is available — tray menu → Settings → Updates to install it."
+                                ),
+                            );
+                        }
+                        break;
+                    }
+                    win::update::UpdateState::Checking => {}
+                    _ => break,
                 }
             }
         });
     }
-
-    // Glow (OpenGL) is the default renderer; wgpu is a fallback for systems
-    // with broken or missing GL drivers (select with SINHALA_TYPER_RENDERER=wgpu).
-    let renderer = if std::env::var("SINHALA_TYPER_RENDERER").as_deref() == Ok("wgpu") {
-        eframe::Renderer::Wgpu
-    } else {
-        eframe::Renderer::Glow
-    };
-    let options = eframe::NativeOptions {
-        renderer,
-        viewport: eframe::egui::ViewportBuilder::default()
-            .with_visible(false)
-            .with_title("Sinhala Typer")
-            .with_icon(std::sync::Arc::new(ui::app_icon()))
-            .with_inner_size([460.0, 640.0])
-            .with_min_inner_size([420.0, 520.0]),
-        ..Default::default()
-    };
-    let result = eframe::run_native(
-        "Sinhala Typer",
-        options,
-        Box::new(|_cc| Ok(Box::new(ui::TyperApp::new(state.clone())))),
-    );
-    if let Err(err) = result {
-        // No usable GPU/renderer: keep running tray-only so typing still works.
-        eprintln!("sinhala_typer: settings window unavailable ({err}); running tray-only");
-        let log = config::Config::config_dir().join("last_error.txt");
-        if let Some(parent) = log.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        let _ = std::fs::write(&log, format!("{err}"));
-        win::pump::pump_forever(state);
-    }
+    win::pump::pump_forever(state);
 }
 
-#[cfg(not(target_os = "windows"))]
-fn main() {
-    println!("sinhala_typer runs on Windows 10/11 only (global keyboard hook + tray UI).");
-    println!("The typing engine core is platform-independent and covered by `cargo test`.");
+#[cfg(target_os = "windows")]
+fn run_settings() {
+    let config = config::Config::load();
+    let state = state::shared_state(config);
+    for renderer in [eframe::Renderer::Wgpu, eframe::Renderer::Glow] {
+        let options = eframe::NativeOptions {
+            viewport: eframe::egui::ViewportBuilder::default()
+                .with_inner_size([560.0, 660.0])
+                .with_min_inner_size([480.0, 520.0])
+                .with_title("Sinhala Typer — Settings")
+                .with_icon(ui::app_icon()),
+            renderer,
+            ..Default::default()
+        };
+        let st = state.clone();
+        match eframe::run_native(
+            "Sinhala Typer",
+            options,
+            Box::new(move |_cc| Ok(Box::new(ui::TyperApp::new(st)))),
+        ) {
+            Ok(()) => return,
+            Err(e) => eprintln!("settings window ({renderer:?}) failed: {e}"),
+        }
+    }
 }

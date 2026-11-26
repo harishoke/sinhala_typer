@@ -1,73 +1,24 @@
 use std::cell::RefCell;
 
 use eframe::egui;
-use muda::{CheckMenuItem, Menu, MenuEvent, MenuItem};
+use muda::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
 mod app_art;
 mod tray_art;
 
-use crate::engine::Mode;
 use crate::state::{lock_read, lock_write, SharedState};
 
-const ID_MODE_ENGLISH: &str = "mode_english";
-const ID_MODE_UNICODE: &str = "mode_unicode";
-const ID_MODE_LEGACY: &str = "mode_legacy";
-const ID_ENABLED: &str = "enabled";
-const ID_NOTIFY: &str = "notify";
+const ICON_SIZE: u32 = 32;
 const ID_SETTINGS: &str = "settings";
+const ID_UPDATE: &str = "check_update";
 const ID_EXIT: &str = "exit";
 
-/// Set when the user really wants to quit (tray Exit, or the updater
-/// handing over to the installer). The close-request handler must let the
-/// window close in that case — v1.2.0 cancelled *every* close, which made
-/// Exit from the tray menu appear to do nothing.
-pub static EXITING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
-/// Ask the app to terminate: the UI loop notices and closes for real.
-pub fn request_exit() {
-    EXITING.store(true, std::sync::atomic::Ordering::SeqCst);
-    crate::win::hook::stop();
-}
-
-/// Set when the user explicitly opens Settings (tray menu / double-click).
-/// Only this — never a stray windowing event — may end the silent start.
-pub static SETTINGS_REQUESTED: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
-
-pub const ICON_SIZE: u32 = 32;
-
-/// Designed tray artwork (see `assets/`): one tile per state, generated from
-/// the app icon. Legacy mode carries an amber status dot, English a slate
-/// dot, and the disabled state is greyed out.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TrayVisual {
-    Unicode,
-    Legacy,
-    English,
-    Off,
-}
-
-fn tray_visual(mode: Mode, enabled: bool) -> TrayVisual {
-    if !enabled {
-        TrayVisual::Off
-    } else {
-        match mode {
-            Mode::Unicode => TrayVisual::Unicode,
-            Mode::LegacyFm => TrayVisual::Legacy,
-            Mode::English => TrayVisual::English,
-        }
-    }
-}
-
-fn tray_icon(visual: TrayVisual) -> Result<Icon, String> {
-    let bytes: &[u8] = match visual {
-        TrayVisual::Unicode => &tray_art::TRAY_UNICODE,
-        TrayVisual::Legacy => &tray_art::TRAY_LEGACY,
-        TrayVisual::English => &tray_art::TRAY_ENGLISH,
-        TrayVisual::Off => &tray_art::TRAY_OFF,
-    };
-    Icon::from_rgba(bytes.to_vec(), ICON_SIZE, ICON_SIZE).map_err(|e| e.to_string())
+/// Tray artwork (see `assets/`): the plain app tile. v2 has no modes to
+/// badge — the active Windows keyboard *is* the mode.
+fn tray_icon() -> Result<Icon, String> {
+    Icon::from_rgba(tray_art::TRAY_UNICODE.to_vec(), ICON_SIZE, ICON_SIZE)
+        .map_err(|e| e.to_string())
 }
 
 /// Raw RGBA of the main app icon, for the settings window / taskbar.
@@ -80,237 +31,93 @@ pub fn app_icon() -> egui::IconData {
 }
 
 struct TrayHandles {
+    #[allow(dead_code)]
     icon: TrayIcon,
-    mode_english: CheckMenuItem,
-    mode_unicode: CheckMenuItem,
-    mode_legacy: CheckMenuItem,
-    enabled: CheckMenuItem,
-    notify: CheckMenuItem,
-    notify_checked: bool,
-    visual: TrayVisual,
-    tooltip: String,
 }
 
-// Tray lives for the whole process on the main thread (muda/tray-icon
-// handles are not Send/Sync), so it survives settings-window failures.
+// The tray lives for the whole companion process on its main thread
+// (muda/tray-icon handles are not Send/Sync).
 thread_local! {
     static TRAY: RefCell<Option<TrayHandles>> = const { RefCell::new(None) };
 }
 
-/// Create the tray icon + menu on the calling (main) thread. Must be called
-/// before the event loop starts so the same thread pumps its messages.
-pub fn init_tray(state: &SharedState) -> Result<(), String> {
-    let (mode, enabled, notifications) = {
-        let st = lock_read(state);
-        (
-            st.config.mode,
-            st.config.enabled,
-            st.config.notifications,
-        )
-    };
-    let visual = tray_visual(mode, enabled);
+/// Create the tray icon + menu on the calling (main) thread.
+pub fn init_tray(_state: &SharedState) -> Result<(), String> {
     let menu = Menu::new();
-    let mode_english = CheckMenuItem::with_id(
-        ID_MODE_ENGLISH,
-        "English",
-        true,
-        mode == Mode::English,
-        None,
-    );
-    let mode_unicode = CheckMenuItem::with_id(
-        ID_MODE_UNICODE,
-        "Sinhala (Unicode)",
-        true,
-        mode == Mode::Unicode,
-        None,
-    );
-    let mode_legacy = CheckMenuItem::with_id(
-        ID_MODE_LEGACY,
-        "Sinhala (FM Abhaya)",
-        true,
-        mode == Mode::LegacyFm,
-        None,
-    );
-    let enabled = CheckMenuItem::with_id(ID_ENABLED, "Typing enabled", true, enabled, None);
-    let notify = CheckMenuItem::with_id(
-        ID_NOTIFY,
-        "Notify on mode change",
-        true,
-        notifications,
-        None,
-    );
-    for item in [&mode_english, &mode_unicode, &mode_legacy, &enabled, &notify] {
-        menu.append(item).map_err(|e| e.to_string())?;
-    }
     let settings = MenuItem::with_id(ID_SETTINGS, "Settings...", true, None);
+    let update = MenuItem::with_id(ID_UPDATE, "Check for updates", true, None);
+    let sep = PredefinedMenuItem::separator();
     let exit = MenuItem::with_id(ID_EXIT, "Exit", true, None);
-    for item in [&settings, &exit] {
-        menu.append(item).map_err(|e| e.to_string())?;
-    }
+    menu.append(&settings).map_err(|e| e.to_string())?;
+    menu.append(&update).map_err(|e| e.to_string())?;
+    menu.append(&sep).map_err(|e| e.to_string())?;
+    menu.append(&exit).map_err(|e| e.to_string())?;
 
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
-        .with_tooltip("Sinhala Typer")
-        .with_icon(tray_icon(visual)?)
+        .with_tooltip("Sinhala Typer — Win+Space switches keyboards")
+        .with_icon(tray_icon()?)
         .build()
         .map_err(|e| e.to_string())?;
     TRAY.with(|t| {
-        *t.borrow_mut() = Some(TrayHandles {
-            icon: tray,
-            mode_english,
-            mode_unicode,
-            mode_legacy,
-            enabled,
-            notify,
-            notify_checked: notifications,
-            visual,
-            tooltip: "Sinhala Typer".to_string(),
-        });
+        *t.borrow_mut() = Some(TrayHandles { icon: tray });
     });
     Ok(())
 }
 
-fn apply_menu_id(state: &SharedState, id: &str) {
-    let mut notify_mode: Option<(Mode, bool)> = None;
-    {
-        let mut st = lock_write(state);
-        match id {
-            ID_MODE_ENGLISH => st.config.mode = Mode::English,
-            ID_MODE_UNICODE => st.config.mode = Mode::Unicode,
-            ID_MODE_LEGACY => st.config.mode = Mode::LegacyFm,
-            ID_ENABLED => st.config.enabled = !st.config.enabled,
-            ID_NOTIFY => st.config.notifications = !st.config.notifications,
-            _ => {}
-        }
-        let _ = st.config.save();
-        if matches!(
-            id,
-            ID_MODE_ENGLISH | ID_MODE_UNICODE | ID_MODE_LEGACY | ID_ENABLED
-        ) && st.config.notifications
-        {
-            notify_mode = Some((st.config.mode, st.config.enabled));
-        }
+/// Open the Settings window: focus it if this process hosts it (the
+/// `--settings` process), otherwise spawn that process.
+fn open_settings(ctx: Option<&egui::Context>) {
+    if let Some(ctx) = ctx {
+        ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+        ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+        return;
     }
-    if let Some((mode, enabled)) = notify_mode {
-        crate::win::notify::mode_changed(mode, enabled);
+    if let Ok(exe) = std::env::current_exe() {
+        let _ = std::process::Command::new(exe).arg("--settings").spawn();
     }
 }
 
-/// Drain tray events. `ctx` is None in the GUI-less fallback mode, where the
-/// Settings item is unavailable and Exit terminates the process.
-pub fn poll_events(state: &SharedState, ctx: Option<&egui::Context>) {
+/// Drain tray events. In the companion process (ctx None) Exit terminates
+/// the process directly — there is no window whose close handler could
+/// interfere, which is exactly why v2 is structured this way (the v1.x
+/// exit bug cannot recur).
+pub fn poll_events(_state: &SharedState, ctx: Option<&egui::Context>) {
     while let Ok(ev) = MenuEvent::receiver().try_recv() {
-        let id = ev.id.0.clone();
-        match id.as_str() {
-            ID_SETTINGS => {
-                SETTINGS_REQUESTED.store(true, std::sync::atomic::Ordering::SeqCst);
-                if let Some(ctx) = ctx {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
-                }
-            }
+        match ev.id.0.as_str() {
+            ID_SETTINGS | ID_UPDATE => open_settings(ctx),
             ID_EXIT => {
-                request_exit();
                 if let Some(ctx) = ctx {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 } else {
                     std::process::exit(0);
                 }
             }
-            _ => apply_menu_id(state, &id),
+            _ => {}
         }
     }
     while let Ok(ev) = TrayIconEvent::receiver().try_recv() {
         if matches!(ev, TrayIconEvent::DoubleClick { .. }) {
-            SETTINGS_REQUESTED.store(true, std::sync::atomic::Ordering::SeqCst);
-            if let Some(ctx) = ctx {
-                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
-                ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
-            }
+            open_settings(ctx);
         }
     }
-    sync_tray(state);
-}
-
-fn sync_tray(state: &SharedState) {
-    TRAY.with(|t| {
-        let mut guard = t.borrow_mut();
-        let Some(h) = guard.as_mut() else { return };
-        let (mode, enabled, notifications) = {
-            let st = lock_read(state);
-            (
-                st.config.mode,
-                st.config.enabled,
-                st.config.notifications,
-            )
-        };
-        if notifications != h.notify_checked {
-            h.notify.set_checked(notifications);
-            h.notify_checked = notifications;
-        }
-        let mode_label = match mode {
-            Mode::English => "English",
-            Mode::Unicode => "Sinhala (Unicode)",
-            Mode::LegacyFm => "Sinhala (FM Abhaya)",
-        };
-        let label = format!(
-            "Sinhala Typer - {}{}",
-            mode_label,
-            if enabled { "" } else { " (off)" }
-        );
-        // Repaints call this several times a second; touching the native
-        // tray on every call flickers and wastes cycles, so update only
-        // what changed.
-        if label != h.tooltip {
-            h.mode_english.set_checked(mode == Mode::English);
-            h.mode_unicode.set_checked(mode == Mode::Unicode);
-            h.mode_legacy.set_checked(mode == Mode::LegacyFm);
-            h.enabled.set_checked(enabled);
-            let _ = h.icon.set_tooltip(Some(&label));
-            h.tooltip = label;
-        }
-        let visual = tray_visual(mode, enabled);
-        if visual != h.visual {
-            if let Ok(icon) = tray_icon(visual) {
-                let _ = h.icon.set_icon(Some(icon));
-                h.visual = visual;
-            }
-        }
-    });
 }
 
 pub struct TyperApp {
     state: SharedState,
-    hotkey_text: String,
-    legacy_text: String,
     status: String,
     icon_tex: Option<egui::TextureHandle>,
     style_applied: bool,
-    /// True once the user has actually opened Settings (tray menu or
-    /// double-click). Until then every frame re-asserts the hidden state:
-    /// v1.2.0 could still surface the window at launch on some systems,
-    /// and the user was explicit — silent start, always.
-    settings_shown: bool,
     tsf_registered: Option<bool>,
 }
 
 impl TyperApp {
     pub fn new(state: SharedState) -> Self {
-        let (hotkey_text, legacy_text) = {
-            let st = lock_read(&state);
-            (
-                st.config.hotkey.clone(),
-                st.config.legacy_processes.join("\n"),
-            )
-        };
         Self {
             state,
-            hotkey_text,
-            legacy_text,
             status: String::new(),
             icon_tex: None,
             style_applied: false,
-            settings_shown: false,
             tsf_registered: None,
         }
     }
@@ -359,83 +166,20 @@ fn section(ui: &mut egui::Ui, title: &str, body: impl FnOnce(&mut egui::Ui)) {
         .show(ui, body);
 }
 
-fn mode_row(
-    ui: &mut egui::Ui,
-    cfg_mode: &mut Mode,
-    value: Mode,
-    title: &str,
-    desc: &str,
-) {
-    let selected = *cfg_mode == value;
-    let frame = egui::Frame::none()
-        .fill(if selected {
-            egui::Color32::from_rgb(30, 58, 95)
-        } else {
-            egui::Color32::from_rgb(31, 38, 50)
-        })
-        .rounding(egui::Rounding::same(10.0))
-        .inner_margin(egui::Margin::same(10.0));
-    frame.show(ui, |ui| {
-        ui.horizontal(|ui| {
-            ui.radio_value(cfg_mode, value, "");
-            ui.vertical(|ui| {
-                ui.label(egui::RichText::new(title).strong().size(14.0));
-                ui.label(
-                    egui::RichText::new(desc)
-                        .size(12.0)
-                        .color(egui::Color32::from_rgb(148, 163, 184)),
-                );
-            });
-        });
-    });
-    ui.add_space(6.0);
-}
-
 impl eframe::App for TyperApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.apply_style(ctx);
         poll_events(&self.state, Some(ctx));
 
-        let exiting = EXITING.load(std::sync::atomic::Ordering::SeqCst);
-        if ctx.input(|i| i.viewport().close_requested()) {
-            if exiting {
-                // Tray Exit (or the updater): really terminate.
-                std::process::exit(0);
-            }
-            // Otherwise closing Settings must never quit the app: the tray
-            // icon is the home of this program. Hide the window instead;
-            // it reopens from the tray menu ("Settings...") or a
-            // double-click on the icon.
-            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
-        }
-
-        // Silent start, enforced: until the user opens Settings from the
-        // tray, keep the window hidden no matter what the windowing layer
-        // decided to do at startup.
-        if SETTINGS_REQUESTED.swap(false, std::sync::atomic::Ordering::SeqCst) {
-            self.settings_shown = true;
-        }
-        if !self.settings_shown {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
-        }
-
         if self.icon_tex.is_none() {
-            let image = egui::ColorImage::from_rgba_unmultiplied(
-                [48, 48],
-                &app_art::APP_ICON_48,
-            );
-            self.icon_tex =
-                Some(ctx.load_texture("app-icon", image, egui::TextureOptions::LINEAR));
+            let image = egui::ColorImage::from_rgba_unmultiplied([48, 48], &app_art::APP_ICON_48);
+            self.icon_tex = Some(ctx.load_texture("app-icon", image, egui::TextureOptions::LINEAR));
         }
 
         // Work on a snapshot of the config and write it back at the end of
-        // the frame if anything changed. Holding the write lock across the
-        // whole frame used to stall the keyboard-hook thread (which reads
-        // the config on every keystroke) whenever Settings was open.
+        // the frame if anything changed.
         let mut cfg = lock_read(&self.state).config.clone();
         let before = format!("{cfg:?}");
-        let mut save_clicked = false;
         let mut autostart_failed = false;
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -469,86 +213,8 @@ impl eframe::App for TyperApp {
                         });
                     });
 
-                section(ui, "Typing mode", |ui| {
-                    mode_row(
-                        ui,
-                        &mut cfg.mode,
-                        Mode::Unicode,
-                        "Sinhala (Unicode)",
-                        "Type Singlish, get Sinhala Unicode everywhere.",
-                    );
-                    mode_row(
-                        ui,
-                        &mut cfg.mode,
-                        Mode::LegacyFm,
-                        "Sinhala (FM Abhaya)",
-                        "Legacy font mode for MS Office documents.",
-                    );
-                    mode_row(
-                        ui,
-                        &mut cfg.mode,
-                        Mode::English,
-                        "English",
-                        "Pass-through: your keyboard works as normal.",
-                    );
-                    ui.checkbox(&mut cfg.enabled, "Typing enabled");
-                    ui.label(
-                        egui::RichText::new(format!(
-                            "Tip: press {} anywhere to cycle modes. If you switch a window to a Sinhala layout in the Windows language bar, Sinhala Typer pauses there automatically.",
-                            cfg.hotkey
-                        ))
-                        .size(12.0)
-                        .color(egui::Color32::from_rgb(148, 163, 184)),
-                    );
-                });
-
-                section(ui, "General", |ui| {
-                    ui.checkbox(&mut cfg.notifications, "Notify me when the mode changes");
-                    if ui
-                        .checkbox(&mut cfg.autostart, "Start with Windows")
-                        .changed()
-                        && !crate::win::autostart::set_autostart(cfg.autostart)
-                    {
-                        autostart_failed = true;
-                    }
-                    ui.add_space(4.0);
-                    ui.label("Mode hotkey (cycles the three modes):");
-                    let response = ui.text_edit_singleline(&mut self.hotkey_text);
-                    if response.changed() {
-                        match crate::config::Hotkey::parse(&self.hotkey_text) {
-                            Ok(_) => {
-                                cfg.hotkey = self.hotkey_text.trim().to_string();
-                                self.status.clear();
-                            }
-                            Err(err) => self.status = format!("Hotkey: {err}"),
-                        }
-                    }
-                    ui.label(
-                        egui::RichText::new("e.g. ctrl+alt+s")
-                            .size(12.0)
-                            .color(egui::Color32::from_rgb(148, 163, 184)),
-                    );
-                });
-
-                section(ui, "FM Abhaya apps", |ui| {
-                    ui.label(
-                        "These apps automatically use FM Abhaya mode while the mode is Sinhala (Unicode). One .exe per line:",
-                    );
-                    ui.add(
-                        egui::TextEdit::multiline(&mut self.legacy_text)
-                            .desired_width(f32::INFINITY)
-                            .desired_rows(4),
-                    );
-                    if ui
-                        .button(egui::RichText::new("Save app list").color(egui::Color32::WHITE))
-                        .clicked()
-                    {
-                        save_clicked = true;
-                    }
-                });
-
                 section(ui, "Windows keyboards", |ui| {
-                    ui.label("Add Sinhala Typer to the Windows language bar as two keyboards — Sinhala Typer (Unicode) and Sinhala Typer (FM Abhaya) — under Settings → Time & language → Language → Sinhala → Keyboards. Switching keyboards with Win+Space then switches this app's mode too.");
+                    ui.label("Sinhala Typer types through two real Windows keyboards — Sinhala Typer (Unicode) and Sinhala Typer (FM Abhaya). Register them here once, then add them under Windows Settings → Time & language → Language → Sinhala → Keyboards and switch with Win+Space. Typing then works in every app, even if this companion app is closed.");
                     if self.tsf_registered.is_none() {
                         self.tsf_registered = Some(crate::win::tsf_reg::is_registered());
                     }
@@ -580,11 +246,22 @@ impl eframe::App for TyperApp {
                                     self.tsf_registered =
                                         Some(crate::win::tsf_reg::is_registered());
                                     self.status =
-                                        "Keyboards added. Find them under the Sinhala language in Windows Settings.".to_string();
+                                        "Keyboards registered. Now add them under the Sinhala language in Windows Settings.".to_string();
                                 }
                                 Err(e) => self.status = e,
                             }
                         }
+                    }
+                });
+
+                section(ui, "General", |ui| {
+                    ui.checkbox(&mut cfg.notifications, "Notify me when an update is available");
+                    if ui
+                        .checkbox(&mut cfg.autostart, "Start with Windows")
+                        .changed()
+                        && !crate::win::autostart::set_autostart(cfg.autostart)
+                    {
+                        autostart_failed = true;
                     }
                 });
 
@@ -635,8 +312,8 @@ impl eframe::App for TyperApp {
                 });
 
                 section(ui, "About", |ui| {
-                    ui.label("Lightweight Sinhala phonetic typing for Windows 10/11. Type Singlish and get Sinhala Unicode in real time, with a legacy FM Abhaya mode for MS Office.");
-                    ui.label("Ctrl / Alt / Win shortcuts (copy, paste, save...) always pass through unchanged.");
+                    ui.label("Sinhala phonetic typing for Windows 10/11 as two real Windows keyboards: type Singlish and get Sinhala Unicode, or pick the FM Abhaya keyboard for legacy-font MS Office documents.");
+                    ui.label("The phonetic layout is the standard ශබ්දානුකූල (phonetic) scheme: doubled vowels are long, capitals give the retroflex letters, and z gives the naasikya letters (zga = ඟ).");
                     ui.add_space(4.0);
                     ui.horizontal(|ui| {
                         ui.label("Created by");
@@ -669,25 +346,15 @@ impl eframe::App for TyperApp {
             });
         });
 
-        if save_clicked {
-            cfg.legacy_processes = self
-                .legacy_text
-                .lines()
-                .map(|l| l.trim().to_string())
-                .filter(|l| !l.is_empty())
-                .collect();
-        }
         if autostart_failed {
             cfg.autostart = crate::win::autostart::is_enabled();
             self.status = "Could not update autostart.".to_string();
         }
-        if format!("{cfg:?}") != before || save_clicked {
+        if format!("{cfg:?}") != before {
             let mut st = lock_write(&self.state);
             st.config = cfg;
-            match st.config.save() {
-                Ok(()) if save_clicked => self.status = "Saved.".to_string(),
-                Ok(()) => {}
-                Err(err) => self.status = format!("Save failed: {err}"),
+            if let Err(err) = st.config.save() {
+                self.status = format!("Save failed: {err}");
             }
         }
 
