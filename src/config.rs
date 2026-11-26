@@ -100,6 +100,9 @@ pub struct Config {
     pub hotkey: String,
     pub legacy_processes: Vec<String>,
     pub autostart: bool,
+    /// Toast notification whenever the typing mode changes. Off by default:
+    /// the tray icon already shows the mode, notifications are opt-in.
+    pub notifications: bool,
 }
 
 impl Default for Config {
@@ -114,6 +117,7 @@ impl Default for Config {
                 "powerpnt.exe".to_string(),
             ],
             autostart: false,
+            notifications: false,
         }
     }
 }
