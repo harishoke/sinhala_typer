@@ -296,4 +296,4 @@ Half-form keys: `C` = ක්‍ + ZWJ, `F` = ත්‍ + ZWJ, `J` = න්‍ + 
 * Rare conjuncts not in Section 6 (e.g. `ස්ථ`, `ස්ව`, `ක්ෂ්‍ය`): use generic al-lakuna + ZWJ form until a visual check confirms a ligature.
 * `ර + ු/ූ` (Section 7).
 * DL-Araliya: a different code table; not included. Add it later as a second file.
-* Symbols, digits and punctuation pass through unchanged.
+* Digits and `-` pass through unchanged. Other punctuation is substituted by the hook in FM mode using the inverse of the Pandukabhaya `singles` punctuation rows (see `fm_punctuation` in `src/engine/legacy.rs`): in the FM font `,` draws ල and `.` draws ග, so the marks are emitted as the characters whose glyphs draw the mark (`,` → `"`, `.` → `'`, `?` → `@`, `:` → `(`, `;` → `¦`, `!` → `æ`, `(` → `^`, `)` → `&`, `"` → `˜`, `/` → `$`, `%` → `]`, `=` → `}`, `+` → `¬`, `{` → `™`, `}` → `š`).
