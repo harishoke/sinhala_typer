@@ -2,10 +2,10 @@
 ; Inno Setup script (sinhala_typer.iss). The GitHub Actions pipeline uses
 ; the Inno script; this one produces the same install layout and is used
 ; for local / cross-built releases.
-; Build: makensis /DVERSION=1.1.0 /DEXE=<path to sinhala_typer.exe> sinhala_typer.nsi
+; Build: makensis /DVERSION=1.2.0 /DEXE=<path to sinhala_typer.exe> sinhala_typer.nsi
 
 !ifndef VERSION
-  !define VERSION "1.1.0"
+  !define VERSION "1.2.0"
 !endif
 !ifndef EXE
   !define EXE "..\target\x86_64-pc-windows-gnu\release\sinhala_typer.exe"
