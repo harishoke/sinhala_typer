@@ -865,6 +865,42 @@ fn register_server_inner() -> HRESULT {
             );
             let _ =
                 profiles.EnableLanguageProfile(&CLSID_TIP, LANGID_SI_LK, &GUID_PROFILE_FM, true);
+            // Also register through the profile-manager API — the modern
+            // path the Windows Settings keyboard list is built from.
+            // Best effort: AddLanguageProfile above may already suffice,
+            // but doing both removes a whole class of "registered yet not
+            // listed" failures. Results are logged either way.
+            if let Ok(mgr) = profiles.cast::<ITfInputProcessorProfileMgr>() {
+                let hkl = windows::Win32::UI::Input::KeyboardAndMouse::HKL::default();
+                let r1 = mgr.RegisterProfile(
+                    &CLSID_TIP,
+                    LANGID_SI_LK,
+                    &GUID_PROFILE_UNICODE,
+                    &desc_u[..desc_u.len() - 1],
+                    empty,
+                    0,
+                    hkl,
+                    0,
+                    BOOL(1),
+                    0,
+                );
+                log_line(&format!("RegisterProfile(Unicode) -> {r1:?}"));
+                let r2 = mgr.RegisterProfile(
+                    &CLSID_TIP,
+                    LANGID_SI_LK,
+                    &GUID_PROFILE_FM,
+                    &desc_f[..desc_f.len() - 1],
+                    empty,
+                    0,
+                    hkl,
+                    0,
+                    BOOL(1),
+                    0,
+                );
+                log_line(&format!("RegisterProfile(FM) -> {r2:?}"));
+            } else {
+                log_line("ProfileMgr cast failed; AddLanguageProfile only");
+            }
             if let Ok(catmgr) = CoCreateInstance::<_, ITfCategoryMgr>(
                 &CLSID_TF_CategoryMgr,
                 None,
