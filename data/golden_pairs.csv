@@ -1,0 +1,191 @@
+id,category,input,unicode_expected,legacy_expected,confidence,helakuru_verified,notes
+G001,vowel,a,අ,,high,,
+G002,vowel,aa,ආ,,high,,
+G003,vowel,ae,ඇ,,medium,,
+G004,vowel,aae,ඈ,,medium,,
+G005,vowel,i,ඉ,,high,,
+G006,vowel,ii,ඊ,,high,,
+G007,vowel,u,උ,,high,,
+G008,vowel,uu,ඌ,,high,,
+G009,vowel,e,එ,,high,,
+G010,vowel,ee,ඒ,,high,,
+G011,vowel,ai,ඓ,,medium,,
+G012,vowel,o,ඔ,,high,,
+G013,vowel,oo,ඕ,,high,,
+G014,vowel,au,ඖ,,medium,,
+G015,vowel,R,ඍ,,low,,vocalic r; key unknown (R? Ru?). VERIFY
+G016,vowel,RR,ඎ,,low,,key unknown. VERIFY
+G017,vowel_sign,kaa,කා,,high,,
+G018,vowel_sign,kae,කැ,,medium,,
+G019,vowel_sign,kaae,කෑ,,medium,,
+G020,vowel_sign,ki,කි,,high,,
+G021,vowel_sign,kii,කී,,high,,
+G022,vowel_sign,ku,කු,,high,,
+G023,vowel_sign,kuu,කූ,,high,,
+G024,vowel_sign,ke,කෙ,,high,,
+G025,vowel_sign,kee,කේ,,high,,
+G026,vowel_sign,kai,කෛ,,medium,,
+G027,vowel_sign,ko,කො,,high,,
+G028,vowel_sign,koo,කෝ,,high,,
+G029,vowel_sign,kau,කෞ,,medium,,
+G030,consonant,ka,ක,,high,,
+G031,consonant,kha,ඛ,,high,,
+G032,consonant,ga,ග,,high,,
+G033,consonant,gha,ඝ,,medium,,
+G034,consonant,cha,ච,,high,,
+G035,consonant,chha,ඡ,,medium,,
+G036,consonant,ja,ජ,,high,,
+G037,consonant,jha,ඣ,,medium,,
+G038,consonant,ta,ට,,low,,TOP PRIORITY VERIFY: is t = ට or ත ?
+G039,consonant,tha,ත,,high,,forum evidence: tha -> ත
+G040,consonant,Ta,ඨ,,low,,VERIFY (capital T)
+G041,consonant,thha,ථ,,low,,VERIFY
+G042,consonant,da,ඩ,,low,,TOP PRIORITY VERIFY: is d = ඩ or ද ?
+G043,consonant,dha,ද,,medium,,VERIFY
+G044,consonant,Da,ඪ,,low,,VERIFY (capital D)
+G045,consonant,dhha,ධ,,low,,VERIFY
+G046,consonant,na,න,,high,,
+G047,consonant,Na,ණ,,medium,,retroflex
+G048,consonant,pa,ප,,high,,
+G049,consonant,pha,ඵ,,medium,,
+G050,consonant,ba,බ,,high,,
+G051,consonant,bha,භ,,medium,,
+G052,consonant,ma,ම,,high,,
+G053,consonant,ya,ය,,high,,
+G054,consonant,ra,ර,,high,,
+G055,consonant,la,ල,,high,,
+G056,consonant,La,ළ,,medium,,retroflex
+G057,consonant,va,ව,,high,,
+G058,consonant,sa,ස,,high,,
+G059,consonant,Sa,ෂ,,medium,,VERIFY
+G060,consonant,sha,ශ,,medium,,VERIFY
+G061,consonant,ha,හ,,high,,
+G062,consonant,fa,ෆ,,high,,
+G063,consonant,gna,ඥ,,low,,VERIFY
+G064,consonant,nja,ඤ,,low,,VERIFY
+G065,consonant,nga,ඞ,,low,,VERIFY
+G066,vowel_sign,maa,මා,,high,,
+G067,vowel_sign,mi,මි,,high,,
+G068,vowel_sign,mii,මී,,high,,
+G069,vowel_sign,mu,මු,,high,,
+G070,vowel_sign,muu,මූ,,high,,
+G071,vowel_sign,me,මෙ,,high,,
+G072,vowel_sign,mee,මේ,,high,,
+G073,vowel_sign,mo,මො,,high,,
+G074,vowel_sign,moo,මෝ,,high,,
+G075,vowel_sign,paa,පා,,high,,
+G076,vowel_sign,pi,පි,,high,,
+G077,vowel_sign,pii,පී,,high,,
+G078,vowel_sign,pu,පු,,high,,
+G079,vowel_sign,puu,පූ,,high,,
+G080,vowel_sign,pe,පෙ,,high,,
+G081,vowel_sign,pee,පේ,,high,,
+G082,vowel_sign,po,පො,,high,,
+G083,vowel_sign,poo,පෝ,,high,,
+G084,vowel_sign,thaa,තා,,high,,
+G085,vowel_sign,thi,ති,,high,,
+G086,vowel_sign,thii,තී,,high,,
+G087,vowel_sign,thu,තු,,high,,
+G088,vowel_sign,thuu,තූ,,high,,
+G089,vowel_sign,the,තෙ,,high,,
+G090,vowel_sign,thee,තේ,,high,,
+G091,vowel_sign,tho,තො,,high,,
+G092,vowel_sign,thoo,තෝ,,high,,
+G093,vowel_sign,raa,රා,,high,,
+G094,vowel_sign,ri,රි,,high,,
+G095,vowel_sign,rii,රී,,high,,
+G096,vowel_sign,ru,රු,,high,,
+G097,vowel_sign,ruu,රූ,,high,,
+G098,vowel_sign,re,රෙ,,high,,
+G099,vowel_sign,ree,රේ,,high,,
+G100,vowel_sign,ro,රො,,high,,
+G101,vowel_sign,roo,රෝ,,high,,
+G102,vowel_sign,saa,සා,,high,,
+G103,vowel_sign,si,සි,,high,,
+G104,vowel_sign,sii,සී,,high,,
+G105,vowel_sign,su,සු,,high,,
+G106,vowel_sign,suu,සූ,,high,,
+G107,vowel_sign,se,සෙ,,high,,
+G108,vowel_sign,see,සේ,,high,,
+G109,vowel_sign,so,සො,,high,,
+G110,vowel_sign,soo,සෝ,,high,,
+G111,hal,k,ක්,,high,,lone consonant shows hal until a vowel arrives
+G112,hal,g,ග්,,high,,lone consonant shows hal until a vowel arrives
+G113,hal,m,ම්,,high,,lone consonant shows hal until a vowel arrives
+G114,hal,n,න්,,high,,lone consonant shows hal until a vowel arrives
+G115,hal,r,ර්,,high,,lone consonant shows hal until a vowel arrives
+G116,hal,l,ල්,,high,,lone consonant shows hal until a vowel arrives
+G117,hal,v,ව්,,high,,lone consonant shows hal until a vowel arrives
+G118,hal,y,ය්,,high,,lone consonant shows hal until a vowel arrives
+G119,hal,s,ස්,,high,,lone consonant shows hal until a vowel arrives
+G120,hal,th,ත්,,high,,lone consonant shows hal until a vowel arrives
+G121,hal,p,ප්,,high,,lone consonant shows hal until a vowel arrives
+G122,hal,b,බ්,,high,,lone consonant shows hal until a vowel arrives
+G123,conjunct,kra,ක්‍ර,,medium,,rakaransaya (hal + ZWJ + ර). VERIFY key rule
+G124,conjunct,gra,ග්‍ර,,medium,,rakaransaya (hal + ZWJ + ර). VERIFY key rule
+G125,conjunct,pra,ප්‍ර,,medium,,rakaransaya (hal + ZWJ + ර). VERIFY key rule
+G126,conjunct,bra,බ්‍ර,,medium,,rakaransaya (hal + ZWJ + ර). VERIFY key rule
+G127,conjunct,thra,ත්‍ර,,medium,,rakaransaya (hal + ZWJ + ර). VERIFY key rule
+G128,conjunct,sra,ස්‍ර,,medium,,rakaransaya (hal + ZWJ + ර). VERIFY key rule
+G129,conjunct,mra,ම්‍ර,,medium,,rakaransaya (hal + ZWJ + ර). VERIFY key rule
+G130,conjunct,hra,හ්‍ර,,medium,,rakaransaya (hal + ZWJ + ර). VERIFY key rule
+G131,conjunct,kya,ක්‍ය,,medium,,yansaya (hal + ZWJ + ය). VERIFY key rule
+G132,conjunct,gya,ග්‍ය,,medium,,yansaya (hal + ZWJ + ය). VERIFY key rule
+G133,conjunct,pya,ප්‍ය,,medium,,yansaya (hal + ZWJ + ය). VERIFY key rule
+G134,conjunct,bya,බ්‍ය,,medium,,yansaya (hal + ZWJ + ය). VERIFY key rule
+G135,conjunct,thya,ත්‍ය,,medium,,yansaya (hal + ZWJ + ය). VERIFY key rule
+G136,conjunct,sya,ස්‍ය,,medium,,yansaya (hal + ZWJ + ය). VERIFY key rule
+G137,conjunct,mya,ම්‍ය,,medium,,yansaya (hal + ZWJ + ය). VERIFY key rule
+G138,conjunct,lya,ල්‍ය,,medium,,yansaya (hal + ZWJ + ය). VERIFY key rule
+G139,conjunct,rka,ර්‍ක,,low,,repaya (ර + hal + ZWJ + C). VERIFY: may need different key
+G140,conjunct,rga,ර්‍ග,,low,,repaya (ර + hal + ZWJ + C). VERIFY: may need different key
+G141,conjunct,rma,ර්‍ම,,low,,repaya (ර + hal + ZWJ + C). VERIFY: may need different key
+G142,conjunct,rtha,ර්‍ත,,low,,repaya (ර + hal + ZWJ + C). VERIFY: may need different key
+G143,conjunct,ksha,ක්ෂ,,low,,ක + hal + ෂ (no ZWJ). VERIFY key rule
+G144,conjunct,mma,ම්ම,,high,,"plain double consonant, no ZWJ"
+G145,conjunct,nna,න්න,,high,,
+G146,conjunct,kka,ක්ක,,high,,
+G147,conjunct,ththa,ත්ත,,medium,,
+G148,anusvara,lankaa,ලංකා,,low,,auto anusvara before k? VERIFY
+G149,anusvara,gangaa,ගංගා,,low,,auto anusvara before g? VERIFY
+G150,anusvara,sinhala,සිංහල,,low,,auto anusvara before h? VERIFY
+G151,anusvara,sangha,සංඝ,,low,,VERIFY
+G152,anusvara,ng,ං,,low,,explicit anusvara key? VERIFY
+G153,anusvara,H,ඃ,,low,,explicit visarga key? VERIFY
+G154,word,amma,අම්ම,,high,,
+G155,word,ammaa,අම්මා,,high,,from Helakuru docs: ammaa -> අම්මා
+G156,word,mama,මම,,high,,
+G157,word,oyaa,ඔයා,,high,,
+G158,word,suba,සුබ,,high,,
+G159,word,paara,පාර,,high,,
+G160,word,lamayaa,ලමයා,,high,,
+G161,word,malli,මල්ලි,,high,,
+G162,word,akkaa,අක්කා,,high,,
+G163,word,nangi,නංගි,,low,,anusvara rule? VERIFY
+G164,word,thaaththaa,තාත්තා,,high,,
+G165,word,mama yanavaa,මම යනවා,,high,,
+G166,word,oyaa enavaa,ඔයා එනවා,,high,,
+G167,word,mama gamata yanavaa,මම ගමට යනවා,,medium,,ta=ට vs ත affects this. VERIFY
+G168,word,kohomadha,කොහොමද,,low,,depends on d/dh rule. VERIFY
+G169,word,gedhara,ගෙදර,,low,,depends on dh rule. VERIFY
+G170,word,sri lankaa,ශ්‍රී ලංකා,,low,,sri may be shree/shrii. VERIFY
+G171,word,shraddhaa,ශ්‍රද්ධා,,low,,VERIFY
+G172,word,vidyaalaya,විද්‍යාලය,,low,,dh/d rule + yansaya. VERIFY
+G173,word,pusthakaalaya,පුස්තකාලය,,medium,,
+G174,passthrough,0,0,,high,,digits unchanged
+G175,passthrough,1,1,,high,,digits unchanged
+G176,passthrough,2,2,,high,,digits unchanged
+G177,passthrough,3,3,,high,,digits unchanged
+G178,passthrough,4,4,,high,,digits unchanged
+G179,passthrough,5,5,,high,,digits unchanged
+G180,passthrough,6,6,,high,,digits unchanged
+G181,passthrough,7,7,,high,,digits unchanged
+G182,passthrough,8,8,,high,,digits unchanged
+G183,passthrough,9,9,,high,,digits unchanged
+G184,passthrough,.,.,,medium,,punctuation unchanged unless Helakuru maps it. VERIFY
+G185,passthrough,",",",",,medium,,punctuation unchanged unless Helakuru maps it. VERIFY
+G186,passthrough,?,?,,medium,,punctuation unchanged unless Helakuru maps it. VERIFY
+G187,passthrough,!,!,,medium,,punctuation unchanged unless Helakuru maps it. VERIFY
+G188,passthrough,:,:,,medium,,punctuation unchanged unless Helakuru maps it. VERIFY
+G189,passthrough,;,;,,medium,,punctuation unchanged unless Helakuru maps it. VERIFY
+G190,passthrough, , ,,high,,space commits pending syllable

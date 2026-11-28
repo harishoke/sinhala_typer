@@ -15,12 +15,13 @@ pub struct EditAction {
     pub insert: String,
 }
 
-#[cfg(test)]
+/// Test/simulation helper: applies `EditAction`s to a plain string, mimicking
+/// what a host application does with the engine's output. Also used by the
+/// golden-table integration test (`tests/golden.rs`).
 pub struct ScreenSim {
     text: String,
 }
 
-#[cfg(test)]
 impl ScreenSim {
     pub fn new() -> Self {
         Self {

@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to build (must match Cargo.toml, e.g. 3.0.0)"
+        description: "Version to build (must match Cargo.toml, e.g. 2.1.0)"
         required: true
-        default: "3.0.0"
+        default: "2.1.0"
       release:
         description: "Publish a GitHub release with the built assets"
         type: boolean
@@ -66,14 +66,26 @@ jobs:
       - name: Install NSIS
         shell: pwsh
         run: |
-          choco install nsis -y --no-progress
+          # windows-latest images usually ship NSIS already. If not, install
+          # via choco - but choco can exit 0 even when the feed 504s, so check
+          # for the actual binary instead of the exit code, and retry.
+          $nsis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (-not (Test-Path $nsis)) {
+            for ($i = 1; $i -le 3 -and -not (Test-Path $nsis); $i++) {
+              choco install nsis -y --no-progress
+              if (-not (Test-Path $nsis)) {
+                Write-Host "choco attempt $i did not produce makensis.exe, retrying after 20s..."
+                Start-Sleep -Seconds 20
+              }
+            }
+          }
+          if (-not (Test-Path $nsis)) { Write-Error "makensis.exe not available"; exit 1 }
+          & $nsis -VERSION
           "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
 
       - name: Stage assets and build installer
         shell: pwsh
         run: |
-          $b64 = (Get-Content assets\sinhala_typer.ico.base64.a -Raw) + (Get-Content assets\sinhala_typer.ico.base64.b -Raw)
-          [IO.File]::WriteAllBytes("assets\sinhala_typer.ico", [Convert]::FromBase64String($b64))
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item target/release/sinhala_typer.exe dist/
           Copy-Item tsf/target/release/sinhala_typer_tsf.dll dist/
@@ -106,9 +118,11 @@ jobs:
           $title = "Sinhala Typer $v"
           gh release view "v$v" --json tagName 2>$null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload "v$v" $assets --clobber
-            gh release edit "v$v" --title $title --latest
-          } elseif (Test-Path $notes) {
+            # Recreate cleanly: a release that is currently draft/prerelease
+            # cannot be flipped to "Latest" via edit (HTTP 422).
+            gh release delete "v$v" --yes
+          }
+          if (Test-Path $notes) {
             gh release create "v$v" $assets --title $title --notes-file $notes --latest
           } else {
             gh release create "v$v" $assets --title $title --generate-notes --latest

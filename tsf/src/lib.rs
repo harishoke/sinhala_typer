@@ -22,7 +22,8 @@ use windows::Win32::Foundation::{
     BOOL, E_FAIL, E_POINTER, HINSTANCE, LPARAM, S_FALSE, S_OK, WPARAM,
 };
 use windows::Win32::System::Com::{
-    CoCreateInstance, IClassFactory, IClassFactory_Impl, CLSCTX_INPROC_SERVER,
+    CoCreateInstance, CoInitializeEx, CoUninitialize, IClassFactory, IClassFactory_Impl,
+    CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED,
 };
 use windows::Win32::System::LibraryLoader::GetModuleFileNameW;
 use windows::Win32::System::Registry::{
@@ -215,7 +216,7 @@ impl EditSession {
     }
 
     unsafe fn move_caret_to(&self, ec: u32, range: &ITfRange) -> windows::core::Result<()> {
-        let mut collapsed = range.clone();
+        let collapsed = range.clone();
         collapsed.Collapse(ec, TF_ANCHOR_END)?;
         let sel = TF_SELECTION {
             range: std::mem::ManuallyDrop::new(Some(collapsed)),
@@ -243,7 +244,7 @@ impl ITfEditSession_Impl for EditSession_Impl {
                                 self.move_caret_to(ec, &range)?;
                             }
                             None => {
-                                let mut range = self.selection_range(ec)?;
+                                let range = self.selection_range(ec)?;
                                 range.Collapse(ec, TF_ANCHOR_START)?;
                                 let ctx_comp = self.context.cast::<ITfContextComposition>()?;
                                 let comp = ctx_comp.StartComposition(ec, &range, &self.sink)?;
@@ -764,6 +765,7 @@ fn module_path() -> Vec<u16> {
     let h = HINSTANCE(MODULE.load(Ordering::SeqCst) as *mut c_void);
     let mut buf = vec![0u16; 1024];
     let len = unsafe { GetModuleFileNameW(h, &mut buf) } as usize;
+    let len = len.min(buf.len() - 1);
     buf.truncate(len + 1);
     buf
 }
@@ -819,7 +821,7 @@ fn unregister_com_server() {
 
 #[no_mangle]
 extern "system" fn DllRegisterServer() -> HRESULT {
-    match guard(|| register_server_inner()) {
+    match guard(register_server_inner) {
         Some(hr) => {
             log_line(&format!("DllRegisterServer -> {hr:?}"));
             hr
@@ -832,6 +834,12 @@ extern "system" fn DllRegisterServer() -> HRESULT {
 }
 
 fn register_server_inner() -> HRESULT {
+    // DllRegisterServer must initialize COM on its own thread before using
+    // any COM API (regsvr32 does not do it for us). Without this,
+    // CoCreateInstance fails with CO_E_NOTINITIALIZED - or worse, can crash
+    // inside ole32 - which is what made regsvr32.exe die during install.
+    let com = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+    let com_initialized = com.is_ok();
     let result = (|| -> windows::core::Result<()> {
         register_com_server()?;
         unsafe {
@@ -924,6 +932,9 @@ fn register_server_inner() -> HRESULT {
         }
         Ok(())
     })();
+    if com_initialized {
+        unsafe { CoUninitialize() };
+    }
     match result {
         Ok(()) => S_OK,
         Err(e) => e.code(),
@@ -932,7 +943,7 @@ fn register_server_inner() -> HRESULT {
 
 #[no_mangle]
 extern "system" fn DllUnregisterServer() -> HRESULT {
-    match guard(|| unregister_server_inner()) {
+    match guard(unregister_server_inner) {
         Some(hr) => {
             log_line(&format!("DllUnregisterServer -> {hr:?}"));
             hr
@@ -945,6 +956,9 @@ extern "system" fn DllUnregisterServer() -> HRESULT {
 }
 
 fn unregister_server_inner() -> HRESULT {
+    // Same COM requirement as DllRegisterServer (see register_server_inner).
+    let com = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+    let com_initialized = com.is_ok();
     unsafe {
         if let Ok(profiles) = CoCreateInstance::<_, ITfInputProcessorProfiles>(
             &CLSID_TF_InputProcessorProfiles,
@@ -972,5 +986,8 @@ fn unregister_server_inner() -> HRESULT {
         }
     }
     unregister_com_server();
+    if com_initialized {
+        unsafe { CoUninitialize() };
+    }
     S_OK
 }

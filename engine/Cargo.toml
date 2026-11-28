@@ -1,6 +1,6 @@
 [package]
 name = "sinhala_engine"
-version = "3.0.0"
+version = "2.1.0"
 edition = "2021"
 description = "Sinhala phonetic typing engines (Singlish -> Unicode, Unicode -> FM Abhaya) shared by the Sinhala Typer app and its TSF text service."
 license = "MIT"

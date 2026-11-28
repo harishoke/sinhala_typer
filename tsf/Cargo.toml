@@ -1,6 +1,6 @@
 [package]
 name = "sinhala_typer_tsf"
-version = "3.0.0"
+version = "2.1.0"
 edition = "2021"
 description = "TSF text service (IME) that provides Sinhala Typer as two Windows keyboards (Unicode / FM Abhaya) under the Sinhala language."
 license = "MIT"

@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  engine-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format check
+        run: cargo fmt --all --check
+      - name: Test engine (incl. golden table)
+        run: cargo test -p sinhala_engine
+
+  lint-and-test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Test app
+        run: cargo test
+      - name: Test TSF service
+        working-directory: tsf
+        run: cargo test
+      - name: Clippy (app)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Clippy (TSF service)
+        working-directory: tsf
+        run: cargo clippy --all-targets -- -D warnings
