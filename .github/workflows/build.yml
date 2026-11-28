@@ -72,8 +72,6 @@ jobs:
       - name: Stage assets and build installer
         shell: pwsh
         run: |
-          $b64 = (Get-Content assets\sinhala_typer.ico.base64.a -Raw) + (Get-Content assets\sinhala_typer.ico.base64.b -Raw)
-          [IO.File]::WriteAllBytes("assets\sinhala_typer.ico", [Convert]::FromBase64String($b64))
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item target/release/sinhala_typer.exe dist/
           Copy-Item tsf/target/release/sinhala_typer_tsf.dll dist/

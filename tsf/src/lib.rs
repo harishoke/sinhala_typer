@@ -215,7 +215,7 @@ impl EditSession {
     }
 
     unsafe fn move_caret_to(&self, ec: u32, range: &ITfRange) -> windows::core::Result<()> {
-        let mut collapsed = range.clone();
+        let collapsed = range.clone();
         collapsed.Collapse(ec, TF_ANCHOR_END)?;
         let sel = TF_SELECTION {
             range: std::mem::ManuallyDrop::new(Some(collapsed)),
@@ -243,7 +243,7 @@ impl ITfEditSession_Impl for EditSession_Impl {
                                 self.move_caret_to(ec, &range)?;
                             }
                             None => {
-                                let mut range = self.selection_range(ec)?;
+                                let range = self.selection_range(ec)?;
                                 range.Collapse(ec, TF_ANCHOR_START)?;
                                 let ctx_comp = self.context.cast::<ITfContextComposition>()?;
                                 let comp = ctx_comp.StartComposition(ec, &range, &self.sink)?;
@@ -819,7 +819,7 @@ fn unregister_com_server() {
 
 #[no_mangle]
 extern "system" fn DllRegisterServer() -> HRESULT {
-    match guard(|| register_server_inner()) {
+    match guard(register_server_inner) {
         Some(hr) => {
             log_line(&format!("DllRegisterServer -> {hr:?}"));
             hr
@@ -932,7 +932,7 @@ fn register_server_inner() -> HRESULT {
 
 #[no_mangle]
 extern "system" fn DllUnregisterServer() -> HRESULT {
-    match guard(|| unregister_server_inner()) {
+    match guard(unregister_server_inner) {
         Some(hr) => {
             log_line(&format!("DllUnregisterServer -> {hr:?}"));
             hr

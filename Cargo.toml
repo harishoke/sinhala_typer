@@ -2,6 +2,9 @@
 name = "sinhala_typer"
 version = "3.0.0"
 edition = "2021"
+description = "Sinhala phonetic typing for Windows: Singlish -> Sinhala Unicode keyboards (TSF) plus an FM Abhaya legacy mode, with a tray companion app for settings and updates."
+license = "MIT"
+repository = "https://github.com/harishoke/sinhala_typer"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
