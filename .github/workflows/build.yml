@@ -118,9 +118,11 @@ jobs:
           $title = "Sinhala Typer $v"
           gh release view "v$v" --json tagName 2>$null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload "v$v" $assets --clobber
-            gh release edit "v$v" --title $title --latest
-          } elseif (Test-Path $notes) {
+            # Recreate cleanly: a release that is currently draft/prerelease
+            # cannot be flipped to "Latest" via edit (HTTP 422).
+            gh release delete "v$v" --yes
+          }
+          if (Test-Path $notes) {
             gh release create "v$v" $assets --title $title --notes-file $notes --latest
           } else {
             gh release create "v$v" $assets --title $title --generate-notes --latest
