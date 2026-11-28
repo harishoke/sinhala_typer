@@ -66,18 +66,21 @@ jobs:
       - name: Install NSIS
         shell: pwsh
         run: |
-          # The Chocolatey feed occasionally 504s; retry before failing.
-          $ok = $false
-          for ($i = 1; $i -le 3 -and -not $ok; $i++) {
-            choco install nsis -y --no-progress
-            if ($LASTEXITCODE -eq 0) { $ok = $true } else {
-              Write-Host "choco attempt $i failed (exit $LASTEXITCODE), retrying after 20s..."
-              Start-Sleep -Seconds 20
+          # windows-latest images usually ship NSIS already. If not, install
+          # via choco - but choco can exit 0 even when the feed 504s, so check
+          # for the actual binary instead of the exit code, and retry.
+          $nsis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (-not (Test-Path $nsis)) {
+            for ($i = 1; $i -le 3 -and -not (Test-Path $nsis); $i++) {
+              choco install nsis -y --no-progress
+              if (-not (Test-Path $nsis)) {
+                Write-Host "choco attempt $i did not produce makensis.exe, retrying after 20s..."
+                Start-Sleep -Seconds 20
+              }
             }
           }
-          if (-not $ok) { Write-Error "choco could not install nsis after 3 attempts"; exit 1 }
-          makensis -VERSION
-          if ($LASTEXITCODE -ne 0) { Write-Error "makensis not on PATH"; exit 1 }
+          if (-not (Test-Path $nsis)) { Write-Error "makensis.exe not available"; exit 1 }
+          & $nsis -VERSION
           "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
 
       - name: Stage assets and build installer
