@@ -26,6 +26,7 @@ one and only keymap on 2026-11-26, replacing the v1.x in-house map. Rules:
 | ii | ඊ U+0D8A | | au / ou | ඖ U+0D96 |
 | u | උ U+0D8B | | R | ඍ U+0D8D |
 | uu | ඌ U+0D8C | | Ru | ඎ U+0D8E |
+| Lu | ඏ U+0D8F | | Luu | ඐ U+0D90 |
 
 ## Consonants (stem + vowel; bare stem = consonant + ්)
 
@@ -67,6 +68,7 @@ one and only keymap on 2026-11-26, replacing the v1.x in-house map. Rules:
 | kuu | කූ (ූ U+0DD6) | | kaX | කඞ (ඞ U+0D9E) |
 | kru | කෘ (ෘ U+0DD8) | | kya | ක්‍ය (් + ZWJ + ය) |
 | kruu | කෲ (ෲ U+0DF2) | | kra | ක්‍ර (් + ZWJ + ර) |
+| kLu | කෟ (ෟ U+0DDF) | | kLuu | කෳ (ෳ U+0DF3) |
 
 Conjuncts: a consonant + `r` + vowel gives the රකාරාංශය (ක්‍ර), a bare
 `r` before another consonant gives රේඵය (ර්‍), and consonant + `y` +

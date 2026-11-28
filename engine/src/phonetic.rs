@@ -28,6 +28,13 @@ const KEYS: &[(&str, Token)] = &[
     ("dhh", Token::Cons('\u{0DB0}')),
     ("zdh", Token::Cons('\u{0DB3}')),
     (
+        "Luu",
+        Token::Vowel {
+            independent: '\u{0D90}',
+            sign: Some('\u{0DF3}'),
+        },
+    ),
+    (
         "ruu",
         Token::Vowel {
             independent: '\u{0D8E}',
@@ -118,6 +125,13 @@ const KEYS: &[(&str, Token)] = &[
         Token::Vowel {
             independent: '\u{0D8C}',
             sign: Some('\u{0DD6}'),
+        },
+    ),
+    (
+        "Lu",
+        Token::Vowel {
+            independent: '\u{0D8F}',
+            sign: Some('\u{0DDF}'),
         },
     ),
     (
@@ -501,7 +515,10 @@ mod tests {
         ("Da", "\u{0DAA}"),
         ("Na", "\u{0DAB}"),
         ("La", "\u{0DC5}"),
-        ("Lu", "\u{0DC5}\u{0DD4}"),
+        ("Lu", "\u{0D8F}"),
+        ("Luu", "\u{0D90}"),
+        ("kLu", "\u{0D9A}\u{0DDF}"),
+        ("kLuu", "\u{0D9A}\u{0DF3}"),
         ("sha", "\u{0DC1}"),
         ("Sha", "\u{0DC2}"),
         ("Sa", "\u{0DC2}"),

@@ -1,6 +1,6 @@
 [package]
 name = "sinhala_typer_tsf"
-version = "2.0.0"
+version = "3.0.0"
 edition = "2021"
 description = "TSF text service (IME) that provides Sinhala Typer as two Windows keyboards (Unicode / FM Abhaya) under the Sinhala language."
 license = "MIT"
@@ -26,4 +26,6 @@ windows = { version = "0.58", features = [
 opt-level = "z"
 lto = true
 strip = true
-panic = "abort"
+# An IME lives inside other applications: a panic must never abort the
+# host process. Every entry point also catches panics (see `guard`).
+panic = "unwind"

@@ -1,5 +1,30 @@
 # Changelog
 
+## 3.0.0 — 2026-11-28
+
+v2.0.0 was published without ever running on a real machine, and field
+reports said the IME did not work. 3.0.0 rebuilds the text service
+defensively and adds the diagnostics that were missing. Released as a
+pre-release (beta) until it is confirmed on a real Windows machine.
+
+### Fixed / hardened — TSF text service
+- **Crash safety:** the DLL no longer uses `panic = "abort"` (a panic
+  would have killed the host application); every COM entry point and DLL
+  export now catches panics and logs them instead.
+- **Registration:** the service now registers the TSF capability
+  categories (immersive/Store-app support, systray support, secure mode,
+  UI-element, input-mode compartment, COM-less) in addition to the
+  keyboard category.
+- **32-bit + 64-bit:** both DLL builds ship; 32-bit apps can now load
+  the IME. The installer (now elevated) registers both during setup;
+  Settings can unregister/re-register both.
+- **Diagnostics:** the DLL logs activation, registration and errors to
+  `%LOCALAPPDATA%\SinhalaTyper\tsf.log`.
+
+### Keymap
+- Completed the adopted phonetic spec: `Lu` = ඏ and `Luu` = ඐ, with
+  signs `kLu` = කෟ and `kLuu` = කෳ.
+
 ## 2.0.0 — 2026-11-26
 
 A ground-up rework of how Sinhala Typer integrates with Windows, driven

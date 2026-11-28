@@ -17,8 +17,10 @@ use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 
 use sinhala_engine::legacy::{fm_punctuation, unicode_to_fm_abhaya};
 use sinhala_engine::phonetic::PhoneticEngine;
-use windows::core::{implement, Interface, IUnknown, IUnknownImpl, GUID, HRESULT, PCWSTR};
-use windows::Win32::Foundation::{BOOL, E_POINTER, HINSTANCE, LPARAM, S_FALSE, S_OK, WPARAM};
+use windows::core::{implement, IUnknown, IUnknownImpl, Interface, GUID, HRESULT, PCWSTR};
+use windows::Win32::Foundation::{
+    BOOL, E_FAIL, E_POINTER, HINSTANCE, LPARAM, S_FALSE, S_OK, WPARAM,
+};
 use windows::Win32::System::Com::{
     CoCreateInstance, IClassFactory, IClassFactory_Impl, CLSCTX_INPROC_SERVER,
 };
@@ -29,14 +31,16 @@ use windows::Win32::System::Registry::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState;
 use windows::Win32::UI::TextServices::{
-    CLSID_TF_CategoryMgr, CLSID_TF_InputProcessorProfiles, GUID_TFCAT_TIP_KEYBOARD,
-    ITfCategoryMgr, ITfComposition, ITfCompositionSink, ITfCompositionSink_Impl, ITfContext,
-    ITfContextComposition, ITfEditSession, ITfEditSession_Impl, ITfInputProcessorProfileMgr,
-    ITfInputProcessorProfiles, ITfKeyEventSink, ITfKeyEventSink_Impl, ITfRange, ITfSource,
-    ITfTextInputProcessor, ITfTextInputProcessorEx, ITfTextInputProcessorEx_Impl,
-    ITfTextInputProcessor_Impl, ITfThreadMgr, TF_AE_END, TF_ANCHOR_END, TF_ANCHOR_START,
-    TF_CONTEXT_EDIT_CONTEXT_FLAGS, TF_DEFAULT_SELECTION, TF_ES_READWRITE, TF_ES_SYNC,
-    TF_INPUTPROCESSORPROFILE, TF_SELECTION, TF_SELECTIONSTYLE,
+    CLSID_TF_CategoryMgr, CLSID_TF_InputProcessorProfiles, ITfCategoryMgr, ITfComposition,
+    ITfCompositionSink, ITfCompositionSink_Impl, ITfContext, ITfContextComposition, ITfEditSession,
+    ITfEditSession_Impl, ITfInputProcessorProfileMgr, ITfInputProcessorProfiles, ITfKeyEventSink,
+    ITfKeyEventSink_Impl, ITfRange, ITfSource, ITfTextInputProcessor, ITfTextInputProcessorEx,
+    ITfTextInputProcessorEx_Impl, ITfTextInputProcessor_Impl, ITfThreadMgr,
+    GUID_TFCAT_TIPCAP_COMLESS, GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
+    GUID_TFCAT_TIPCAP_INPUTMODECOMPARTMENT, GUID_TFCAT_TIPCAP_SECUREMODE,
+    GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT, GUID_TFCAT_TIPCAP_UIELEMENTENABLED, GUID_TFCAT_TIP_KEYBOARD,
+    TF_AE_END, TF_ANCHOR_END, TF_ANCHOR_START, TF_CONTEXT_EDIT_CONTEXT_FLAGS, TF_DEFAULT_SELECTION,
+    TF_ES_READWRITE, TF_ES_SYNC, TF_INPUTPROCESSORPROFILE, TF_SELECTION, TF_SELECTIONSTYLE,
 };
 
 /// CLSID of this text service.
@@ -51,6 +55,54 @@ const LANGID_SI_LK: u16 = 0x045B;
 static MODULE: AtomicUsize = AtomicUsize::new(0);
 static OBJ_COUNT: AtomicI32 = AtomicI32::new(0);
 
+// ---------------------------------------------------------------------------
+// Diagnostics + crash safety
+//
+// An IME runs inside other applications: no console, no easy debugger, and
+// a panic that escapes a COM entry point aborts the *host* app. So:
+//  - `panic = "unwind"` (tsf/Cargo.toml) and every entry point runs inside
+//    `guard`, which catches panics and logs them.
+//  - Key lifecycle events are appended to %LOCALAPPDATA%\SinhalaTyper\
+//    tsf.log — the primary evidence when something fails on a real machine.
+// ---------------------------------------------------------------------------
+
+fn log_line(msg: &str) {
+    use std::io::Write;
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let Ok(_guard) = LOCK.lock() else {
+        return;
+    };
+    let Some(base) = std::env::var_os("LOCALAPPDATA") else {
+        return;
+    };
+    let dir = std::path::Path::new(&base).join("SinhalaTyper");
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("tsf.log"))
+    else {
+        return;
+    };
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let _ = writeln!(f, "[{secs}] {msg}");
+}
+
+fn guard<T>(f: impl FnOnce() -> T) -> Option<T> {
+    static HOOK: std::sync::Once = std::sync::Once::new();
+    HOOK.call_once(|| {
+        std::panic::set_hook(Box::new(|info| {
+            log_line(&format!("panic: {info}"));
+        }));
+    });
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).ok()
+}
+
 fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain([0]).collect()
 }
@@ -58,8 +110,17 @@ fn wide(s: &str) -> Vec<u16> {
 fn guid_string(g: &GUID) -> String {
     format!(
         "{{{:08X}-{:04X}-{:04X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
-        g.data1, g.data2, g.data3, g.data4[0], g.data4[1], g.data4[2], g.data4[3], g.data4[4],
-        g.data4[5], g.data4[6], g.data4[7]
+        g.data1,
+        g.data2,
+        g.data3,
+        g.data4[0],
+        g.data4[1],
+        g.data4[2],
+        g.data4[3],
+        g.data4[4],
+        g.data4[5],
+        g.data4[6],
+        g.data4[7]
     )
 }
 
@@ -169,46 +230,50 @@ impl EditSession {
 
 impl ITfEditSession_Impl for EditSession_Impl {
     fn DoEditSession(&self, ec: u32) -> windows::core::Result<()> {
-        unsafe {
-            match &self.action {
-                Action::Update(text) => {
-                    let existing = self.state.borrow().composition.clone();
-                    let text_w: Vec<u16> = text.encode_utf16().collect();
-                    match existing {
-                        Some(comp) => {
-                            let range = comp.GetRange()?;
-                            range.SetText(ec, 0, &text_w)?;
-                            self.move_caret_to(ec, &range)?;
-                        }
-                        None => {
-                            let mut range = self.selection_range(ec)?;
-                            range.Collapse(ec, TF_ANCHOR_START)?;
-                            let ctx_comp = self
-                                .context
-                                .cast::<ITfContextComposition>()?;
-                            let comp = ctx_comp.StartComposition(ec, &range, &self.sink)?;
-                            let crange = comp.GetRange()?;
-                            crange.SetText(ec, 0, &text_w)?;
-                            self.state.borrow_mut().composition = Some(comp);
-                            self.move_caret_to(ec, &crange)?;
+        guard(|| -> windows::core::Result<()> {
+            unsafe {
+                match &self.action {
+                    Action::Update(text) => {
+                        let existing = self.state.borrow().composition.clone();
+                        let text_w: Vec<u16> = text.encode_utf16().collect();
+                        match existing {
+                            Some(comp) => {
+                                let range = comp.GetRange()?;
+                                range.SetText(ec, 0, &text_w)?;
+                                self.move_caret_to(ec, &range)?;
+                            }
+                            None => {
+                                let mut range = self.selection_range(ec)?;
+                                range.Collapse(ec, TF_ANCHOR_START)?;
+                                let ctx_comp = self.context.cast::<ITfContextComposition>()?;
+                                let comp = ctx_comp.StartComposition(ec, &range, &self.sink)?;
+                                let crange = comp.GetRange()?;
+                                crange.SetText(ec, 0, &text_w)?;
+                                self.state.borrow_mut().composition = Some(comp);
+                                self.move_caret_to(ec, &crange)?;
+                            }
                         }
                     }
-                }
-                Action::End => {
-                    let existing = self.state.borrow_mut().composition.take();
-                    if let Some(comp) = existing {
-                        comp.EndComposition(ec)?;
+                    Action::End => {
+                        let existing = self.state.borrow_mut().composition.take();
+                        if let Some(comp) = existing {
+                            comp.EndComposition(ec)?;
+                        }
                     }
-                }
-                Action::Insert(text) => {
-                    let range = self.selection_range(ec)?;
-                    let text_w: Vec<u16> = text.encode_utf16().collect();
-                    range.SetText(ec, 0, &text_w)?;
-                    self.move_caret_to(ec, &range)?;
+                    Action::Insert(text) => {
+                        let range = self.selection_range(ec)?;
+                        let text_w: Vec<u16> = text.encode_utf16().collect();
+                        range.SetText(ec, 0, &text_w)?;
+                        self.move_caret_to(ec, &range)?;
+                    }
                 }
             }
-        }
-        Ok(())
+            Ok(())
+        })
+        .unwrap_or_else(|| {
+            log_line("PANIC in DoEditSession");
+            Err(E_FAIL.into())
+        })
     }
 }
 
@@ -298,7 +363,9 @@ impl TextService {
         }
         .into();
         let flags = TF_CONTEXT_EDIT_CONTEXT_FLAGS(TF_ES_SYNC.0 | TF_ES_READWRITE.0);
-        let _ = unsafe { ctx.RequestEditSession(tid, &session, flags) };
+        if let Err(e) = unsafe { ctx.RequestEditSession(tid, &session, flags) } {
+            log_line(&format!("RequestEditSession failed: {e:?}"));
+        }
     }
 
     fn end_composition(&self, ctx: &ITfContext) {
@@ -310,6 +377,10 @@ impl TextService {
 
     /// Decide whether a key-down is ours, without mutating state.
     fn would_eat(&self, vk: u32) -> bool {
+        guard(|| self.would_eat_inner(vk)).unwrap_or(false)
+    }
+
+    fn would_eat_inner(&self, vk: u32) -> bool {
         if key_down(VK_CONTROL) || key_down(VK_MENU) {
             return false;
         }
@@ -331,42 +402,63 @@ impl TextService {
 
 impl ITfTextInputProcessor_Impl for TextService_Impl {
     fn Activate(&self, ptim: Option<&ITfThreadMgr>, tid: u32) -> windows::core::Result<()> {
-        let Some(tm) = ptim else {
-            return Ok(());
-        };
-        {
-            let mut st = self.state.borrow_mut();
-            st.thread_mgr = Some(tm.clone());
-            st.client_id = tid;
-            st.fm = current_profile_is_fm();
-            st.comp_sink = Some(self.to_interface::<ITfCompositionSink>());
-        }
-        if let Ok(source) = tm.cast::<ITfSource>() {
-            let sink: IUnknown = self.to_interface::<ITfKeyEventSink>().into();
-            if let Ok(cookie) = unsafe { source.AdviseSink(&ITfKeyEventSink::IID, &sink) } {
-                self.state.borrow_mut().key_sink_cookie = cookie;
+        guard(|| -> windows::core::Result<()> {
+            log_line("Activate");
+            let Some(tm) = ptim else {
+                return Ok(());
+            };
+            {
+                let mut st = self.state.borrow_mut();
+                st.thread_mgr = Some(tm.clone());
+                st.client_id = tid;
+                st.fm = current_profile_is_fm();
+                st.comp_sink = Some(self.to_interface::<ITfCompositionSink>());
             }
-        }
-        Ok(())
+            let fm = self.state.borrow().fm;
+            if let Ok(source) = tm.cast::<ITfSource>() {
+                let sink: IUnknown = self.to_interface::<ITfKeyEventSink>().into();
+                match unsafe { source.AdviseSink(&ITfKeyEventSink::IID, &sink) } {
+                    Ok(cookie) => {
+                        self.state.borrow_mut().key_sink_cookie = cookie;
+                        log_line(&format!("Activate ok: key sink advised (fm={fm})"));
+                    }
+                    Err(e) => log_line(&format!("Activate: AdviseSink failed: {e:?}")),
+                }
+            } else {
+                log_line("Activate: ITfSource cast failed");
+            }
+            Ok(())
+        })
+        .unwrap_or_else(|| {
+            log_line("PANIC in Activate");
+            Err(E_FAIL.into())
+        })
     }
 
     fn Deactivate(&self) -> windows::core::Result<()> {
-        let (tm, cookie) = {
-            let st = self.state.borrow();
-            (st.thread_mgr.clone(), st.key_sink_cookie)
-        };
-        if let Some(tm) = tm {
-            if let Ok(source) = tm.cast::<ITfSource>() {
-                let _ = unsafe { source.UnadviseSink(cookie) };
+        guard(|| -> windows::core::Result<()> {
+            log_line("Deactivate");
+            let (tm, cookie) = {
+                let st = self.state.borrow();
+                (st.thread_mgr.clone(), st.key_sink_cookie)
+            };
+            if let Some(tm) = tm {
+                if let Ok(source) = tm.cast::<ITfSource>() {
+                    let _ = unsafe { source.UnadviseSink(cookie) };
+                }
             }
-        }
-        let mut st = self.state.borrow_mut();
-        st.thread_mgr = None;
-        st.comp_sink = None;
-        st.key_sink_cookie = 0;
-        st.word.clear();
-        st.composition = None;
-        Ok(())
+            let mut st = self.state.borrow_mut();
+            st.thread_mgr = None;
+            st.comp_sink = None;
+            st.key_sink_cookie = 0;
+            st.word.clear();
+            st.composition = None;
+            Ok(())
+        })
+        .unwrap_or_else(|| {
+            log_line("PANIC in Deactivate");
+            Err(E_FAIL.into())
+        })
     }
 }
 
@@ -387,21 +479,33 @@ impl ITfCompositionSink_Impl for TextService_Impl {
         _ecwrite: u32,
         _pcomposition: Option<&ITfComposition>,
     ) -> windows::core::Result<()> {
-        let mut st = self.state.borrow_mut();
-        st.composition = None;
-        st.word.clear();
-        Ok(())
+        guard(|| -> windows::core::Result<()> {
+            let mut st = self.state.borrow_mut();
+            st.composition = None;
+            st.word.clear();
+            Ok(())
+        })
+        .unwrap_or_else(|| {
+            log_line("PANIC in OnCompositionTerminated");
+            Err(E_FAIL.into())
+        })
     }
 }
 
 impl ITfKeyEventSink_Impl for TextService_Impl {
     fn OnSetFocus(&self, fforeground: BOOL) -> windows::core::Result<()> {
-        if !fforeground.as_bool() {
-            let mut st = self.state.borrow_mut();
-            st.word.clear();
-            st.composition = None;
-        }
-        Ok(())
+        guard(|| -> windows::core::Result<()> {
+            if !fforeground.as_bool() {
+                let mut st = self.state.borrow_mut();
+                st.word.clear();
+                st.composition = None;
+            }
+            Ok(())
+        })
+        .unwrap_or_else(|| {
+            log_line("PANIC in OnSetFocus");
+            Err(E_FAIL.into())
+        })
     }
 
     fn OnTestKeyDown(
@@ -428,61 +532,72 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
         wparam: WPARAM,
         _lparam: LPARAM,
     ) -> windows::core::Result<BOOL> {
-        let Some(ctx) = pic else {
-            return Ok(BOOL(0));
-        };
-        let vk = wparam.0 as u32;
-        if key_down(VK_CONTROL) || key_down(VK_MENU) {
-            self.end_composition(ctx);
-            return Ok(BOOL(0));
-        }
-        if vk == VK_BACK {
-            let has_word = !self.state.borrow().word.is_empty();
-            if !has_word {
+        guard(|| -> windows::core::Result<BOOL> {
+            let Some(ctx) = pic else {
                 return Ok(BOOL(0));
-            }
-            let (text, empty) = {
-                let mut st = self.state.borrow_mut();
-                st.word.pop();
-                (render(&st.word, st.fm), st.word.is_empty())
             };
-            if empty {
-                self.request(ctx, Action::Update(String::new()));
-                self.request(ctx, Action::End);
-                self.state.borrow_mut().composition = None;
-            } else {
-                self.request(ctx, Action::Update(text));
+            let vk = wparam.0 as u32;
+            static KEY_EVENTS: AtomicUsize = AtomicUsize::new(0);
+            let n = KEY_EVENTS.fetch_add(1, Ordering::SeqCst);
+            if n < 10 {
+                log_line(&format!("OnKeyDown #{n}: vk={vk:#04x}"));
             }
-            return Ok(BOOL(1));
-        }
-        if let Some(c) = letter_of(vk) {
-            if !PhoneticEngine::accepts(c) {
+            if key_down(VK_CONTROL) || key_down(VK_MENU) {
                 self.end_composition(ctx);
                 return Ok(BOOL(0));
             }
-            let text = {
-                let mut st = self.state.borrow_mut();
-                st.word.push(c);
-                render(&st.word, st.fm)
-            };
-            self.request(ctx, Action::Update(text));
-            return Ok(BOOL(1));
-        }
-        // FM profile: punctuation that the FM font would draw as letters
-        // is committed as the substitute glyph instead.
-        let is_fm = self.state.borrow().fm;
-        if is_fm {
-            if let Some(ch) = punct_char(vk) {
-                if let Some(sub) = fm_punctuation(ch) {
+            if vk == VK_BACK {
+                let has_word = !self.state.borrow().word.is_empty();
+                if !has_word {
+                    return Ok(BOOL(0));
+                }
+                let (text, empty) = {
+                    let mut st = self.state.borrow_mut();
+                    st.word.pop();
+                    (render(&st.word, st.fm), st.word.is_empty())
+                };
+                if empty {
+                    self.request(ctx, Action::Update(String::new()));
+                    self.request(ctx, Action::End);
+                    self.state.borrow_mut().composition = None;
+                } else {
+                    self.request(ctx, Action::Update(text));
+                }
+                return Ok(BOOL(1));
+            }
+            if let Some(c) = letter_of(vk) {
+                if !PhoneticEngine::accepts(c) {
                     self.end_composition(ctx);
-                    self.request(ctx, Action::Insert(sub.to_string()));
-                    return Ok(BOOL(1));
+                    return Ok(BOOL(0));
+                }
+                let text = {
+                    let mut st = self.state.borrow_mut();
+                    st.word.push(c);
+                    render(&st.word, st.fm)
+                };
+                self.request(ctx, Action::Update(text));
+                return Ok(BOOL(1));
+            }
+            // FM profile: punctuation that the FM font would draw as letters
+            // is committed as the substitute glyph instead.
+            let is_fm = self.state.borrow().fm;
+            if is_fm {
+                if let Some(ch) = punct_char(vk) {
+                    if let Some(sub) = fm_punctuation(ch) {
+                        self.end_composition(ctx);
+                        self.request(ctx, Action::Insert(sub.to_string()));
+                        return Ok(BOOL(1));
+                    }
                 }
             }
-        }
-        // Anything else (space, enter, arrows...) commits the word.
-        self.end_composition(ctx);
-        Ok(BOOL(0))
+            // Anything else (space, enter, arrows...) commits the word.
+            self.end_composition(ctx);
+            Ok(BOOL(0))
+        })
+        .unwrap_or_else(|| {
+            log_line("PANIC in OnKeyDown");
+            Ok(BOOL(0))
+        })
     }
 
     fn OnKeyUp(
@@ -503,6 +618,12 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
     }
 }
 
+impl Drop for TextService {
+    fn drop(&mut self) {
+        OBJ_COUNT.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Class factory
 // ---------------------------------------------------------------------------
@@ -517,53 +638,59 @@ impl IClassFactory_Impl for ClassFactory_Impl {
         iid: *const GUID,
         ppv: *mut *mut c_void,
     ) -> windows::core::Result<()> {
-        if ppv.is_null() || iid.is_null() {
-            return Err(E_POINTER.into());
-        }
-        unsafe {
-            *ppv = std::ptr::null_mut();
-        }
-        let service: ITfTextInputProcessor = TextService {
-            state: Rc::new(RefCell::new(State::default())),
-        }
-        .into();
-        OBJ_COUNT.fetch_add(1, Ordering::SeqCst);
-        unsafe {
-            let wanted = *iid;
-            if wanted == ITfTextInputProcessor::IID || wanted == IUnknown::IID {
-                *ppv = service.into_raw();
-            } else if wanted == ITfTextInputProcessorEx::IID {
-                match service.cast::<ITfTextInputProcessorEx>() {
-                    Ok(ex) => *ppv = ex.into_raw(),
-                    Err(e) => {
-                        OBJ_COUNT.fetch_sub(1, Ordering::SeqCst);
-                        return Err(e);
-                    }
-                }
-            } else if wanted == ITfKeyEventSink::IID {
-                match service.cast::<ITfKeyEventSink>() {
-                    Ok(s) => *ppv = s.into_raw(),
-                    Err(e) => {
-                        OBJ_COUNT.fetch_sub(1, Ordering::SeqCst);
-                        return Err(e);
-                    }
-                }
-            } else if wanted == ITfCompositionSink::IID {
-                match service.cast::<ITfCompositionSink>() {
-                    Ok(s) => *ppv = s.into_raw(),
-                    Err(e) => {
-                        OBJ_COUNT.fetch_sub(1, Ordering::SeqCst);
-                        return Err(e);
-                    }
-                }
-            } else {
-                OBJ_COUNT.fetch_sub(1, Ordering::SeqCst);
-                return Err(windows::core::Error::from_hresult(
-                    windows::Win32::Foundation::E_NOINTERFACE,
-                ));
+        guard(|| -> windows::core::Result<()> {
+            if ppv.is_null() || iid.is_null() {
+                return Err(E_POINTER.into());
             }
-        }
-        Ok(())
+            unsafe {
+                *ppv = std::ptr::null_mut();
+            }
+            let service: ITfTextInputProcessor = TextService {
+                state: Rc::new(RefCell::new(State::default())),
+            }
+            .into();
+            OBJ_COUNT.fetch_add(1, Ordering::SeqCst);
+            unsafe {
+                let wanted = *iid;
+                if wanted == ITfTextInputProcessor::IID || wanted == IUnknown::IID {
+                    *ppv = service.into_raw();
+                } else if wanted == ITfTextInputProcessorEx::IID {
+                    match service.cast::<ITfTextInputProcessorEx>() {
+                        Ok(ex) => *ppv = ex.into_raw(),
+                        Err(e) => {
+                            OBJ_COUNT.fetch_sub(1, Ordering::SeqCst);
+                            return Err(e);
+                        }
+                    }
+                } else if wanted == ITfKeyEventSink::IID {
+                    match service.cast::<ITfKeyEventSink>() {
+                        Ok(s) => *ppv = s.into_raw(),
+                        Err(e) => {
+                            OBJ_COUNT.fetch_sub(1, Ordering::SeqCst);
+                            return Err(e);
+                        }
+                    }
+                } else if wanted == ITfCompositionSink::IID {
+                    match service.cast::<ITfCompositionSink>() {
+                        Ok(s) => *ppv = s.into_raw(),
+                        Err(e) => {
+                            OBJ_COUNT.fetch_sub(1, Ordering::SeqCst);
+                            return Err(e);
+                        }
+                    }
+                } else {
+                    OBJ_COUNT.fetch_sub(1, Ordering::SeqCst);
+                    return Err(windows::core::Error::from_hresult(
+                        windows::Win32::Foundation::E_NOINTERFACE,
+                    ));
+                }
+            }
+            Ok(())
+        })
+        .unwrap_or_else(|| {
+            log_line("PANIC in CreateInstance");
+            Err(E_FAIL.into())
+        })
     }
 
     fn LockServer(&self, _lock: BOOL) -> windows::core::Result<()> {
@@ -586,6 +713,20 @@ extern "system" fn DllMain(hinst: HINSTANCE, reason: u32, _reserved: *mut c_void
 
 #[no_mangle]
 unsafe extern "system" fn DllGetClassObject(
+    rclsid: *const GUID,
+    riid: *const GUID,
+    ppv: *mut *mut c_void,
+) -> HRESULT {
+    match guard(|| unsafe { get_class_object_inner(rclsid, riid, ppv) }) {
+        Some(hr) => hr,
+        None => {
+            log_line("PANIC in DllGetClassObject");
+            E_FAIL
+        }
+    }
+}
+
+unsafe fn get_class_object_inner(
     rclsid: *const GUID,
     riid: *const GUID,
     ppv: *mut *mut c_void,
@@ -678,14 +819,24 @@ fn unregister_com_server() {
 
 #[no_mangle]
 extern "system" fn DllRegisterServer() -> HRESULT {
+    match guard(|| register_server_inner()) {
+        Some(hr) => {
+            log_line(&format!("DllRegisterServer -> {hr:?}"));
+            hr
+        }
+        None => {
+            log_line("PANIC in DllRegisterServer");
+            E_FAIL
+        }
+    }
+}
+
+fn register_server_inner() -> HRESULT {
     let result = (|| -> windows::core::Result<()> {
         register_com_server()?;
         unsafe {
-            let profiles: ITfInputProcessorProfiles = CoCreateInstance(
-                &CLSID_TF_InputProcessorProfiles,
-                None,
-                CLSCTX_INPROC_SERVER,
-            )?;
+            let profiles: ITfInputProcessorProfiles =
+                CoCreateInstance(&CLSID_TF_InputProcessorProfiles, None, CLSCTX_INPROC_SERVER)?;
             profiles.Register(&CLSID_TIP)?;
             let desc_u = wide("Sinhala Typer (Unicode)");
             let desc_f = wide("Sinhala Typer (FM Abhaya)");
@@ -712,18 +863,27 @@ extern "system" fn DllRegisterServer() -> HRESULT {
                 &GUID_PROFILE_UNICODE,
                 true,
             );
-            let _ = profiles.EnableLanguageProfile(
-                &CLSID_TIP,
-                LANGID_SI_LK,
-                &GUID_PROFILE_FM,
-                true,
-            );
+            let _ =
+                profiles.EnableLanguageProfile(&CLSID_TIP, LANGID_SI_LK, &GUID_PROFILE_FM, true);
             if let Ok(catmgr) = CoCreateInstance::<_, ITfCategoryMgr>(
                 &CLSID_TF_CategoryMgr,
                 None,
                 CLSCTX_INPROC_SERVER,
             ) {
                 let _ = catmgr.RegisterCategory(&CLSID_TIP, &GUID_TFCAT_TIP_KEYBOARD, &CLSID_TIP);
+                // Capability categories: without IMMERSIVESUPPORT the
+                // keyboard is unavailable in Store/UWP apps, without
+                // SYSTRAYSUPPORT it may not appear in the tray switcher.
+                for cap in [
+                    GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
+                    GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,
+                    GUID_TFCAT_TIPCAP_SECUREMODE,
+                    GUID_TFCAT_TIPCAP_UIELEMENTENABLED,
+                    GUID_TFCAT_TIPCAP_INPUTMODECOMPARTMENT,
+                    GUID_TFCAT_TIPCAP_COMLESS,
+                ] {
+                    let _ = catmgr.RegisterCategory(&CLSID_TIP, &cap, &CLSID_TIP);
+                }
             }
         }
         Ok(())
@@ -736,6 +896,19 @@ extern "system" fn DllRegisterServer() -> HRESULT {
 
 #[no_mangle]
 extern "system" fn DllUnregisterServer() -> HRESULT {
+    match guard(|| unregister_server_inner()) {
+        Some(hr) => {
+            log_line(&format!("DllUnregisterServer -> {hr:?}"));
+            hr
+        }
+        None => {
+            log_line("PANIC in DllUnregisterServer");
+            E_FAIL
+        }
+    }
+}
+
+fn unregister_server_inner() -> HRESULT {
     unsafe {
         if let Ok(profiles) = CoCreateInstance::<_, ITfInputProcessorProfiles>(
             &CLSID_TF_InputProcessorProfiles,
@@ -746,12 +919,20 @@ extern "system" fn DllUnregisterServer() -> HRESULT {
             let _ = profiles.RemoveLanguageProfile(&CLSID_TIP, LANGID_SI_LK, &GUID_PROFILE_FM);
             let _ = profiles.Unregister(&CLSID_TIP);
         }
-        if let Ok(catmgr) = CoCreateInstance::<_, ITfCategoryMgr>(
-            &CLSID_TF_CategoryMgr,
-            None,
-            CLSCTX_INPROC_SERVER,
-        ) {
+        if let Ok(catmgr) =
+            CoCreateInstance::<_, ITfCategoryMgr>(&CLSID_TF_CategoryMgr, None, CLSCTX_INPROC_SERVER)
+        {
             let _ = catmgr.UnregisterCategory(&CLSID_TIP, &GUID_TFCAT_TIP_KEYBOARD, &CLSID_TIP);
+            for cap in [
+                GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
+                GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,
+                GUID_TFCAT_TIPCAP_SECUREMODE,
+                GUID_TFCAT_TIPCAP_UIELEMENTENABLED,
+                GUID_TFCAT_TIPCAP_INPUTMODECOMPARTMENT,
+                GUID_TFCAT_TIPCAP_COMLESS,
+            ] {
+                let _ = catmgr.UnregisterCategory(&CLSID_TIP, &cap, &CLSID_TIP);
+            }
         }
     }
     unregister_com_server();
