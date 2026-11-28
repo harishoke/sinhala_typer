@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to build (must match Cargo.toml, e.g. 2.0.0)"
+        description: "Version to build (must match Cargo.toml, e.g. 3.0.0)"
         required: true
-        default: "2.0.0"
+        default: "3.0.0"
       release:
         description: "Publish a GitHub release with the built assets"
         type: boolean
@@ -56,6 +56,13 @@ jobs:
         working-directory: tsf
         run: cargo build --release
 
+      - name: Add 32-bit target
+        run: rustup target add i686-pc-windows-msvc
+
+      - name: Build TSF text service (32-bit)
+        working-directory: tsf
+        run: cargo build --release --target i686-pc-windows-msvc
+
       - name: Install NSIS
         shell: pwsh
         run: |
@@ -70,8 +77,9 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item target/release/sinhala_typer.exe dist/
           Copy-Item tsf/target/release/sinhala_typer_tsf.dll dist/
+          Copy-Item tsf/target/i686-pc-windows-msvc/release/sinhala_typer_tsf.dll dist/sinhala_typer_tsf_x86.dll
           $v = "${{ steps.ver.outputs.version }}"
-          makensis "/DVERSION=$v" "/DEXE=$((Resolve-Path dist/sinhala_typer.exe).Path)" "/DTSF=$((Resolve-Path dist/sinhala_typer_tsf.dll).Path)" "/DICO=$((Resolve-Path assets/sinhala_typer.ico).Path)" installer/sinhala_typer.nsi
+          makensis "/DVERSION=$v" "/DEXE=$((Resolve-Path dist/sinhala_typer.exe).Path)" "/DTSF=$((Resolve-Path dist/sinhala_typer_tsf.dll).Path)" "/DTSFX86=$((Resolve-Path dist/sinhala_typer_tsf_x86.dll).Path)" "/DICO=$((Resolve-Path assets/sinhala_typer.ico).Path)" installer/sinhala_typer.nsi
           Move-Item "installer/sinhala_typer-setup-$v.exe" dist/
           Get-ChildItem dist | Format-Table Name, Length
 
@@ -92,7 +100,8 @@ jobs:
           $assets = @(
             "dist/sinhala_typer-setup-$v.exe",
             "dist/sinhala_typer.exe",
-            "dist/sinhala_typer_tsf.dll"
+            "dist/sinhala_typer_tsf.dll",
+            "dist/sinhala_typer_tsf_x86.dll"
           )
           $title = "Sinhala Typer $v"
           gh release view "v$v" --json tagName 2>$null
