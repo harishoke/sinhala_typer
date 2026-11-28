@@ -1,6 +1,6 @@
 [package]
 name = "sinhala_typer"
-version = "3.0.0"
+version = "2.1.0"
 edition = "2021"
 description = "Sinhala phonetic typing for Windows: Singlish -> Sinhala Unicode keyboards (TSF) plus an FM Abhaya legacy mode, with a tray companion app for settings and updates."
 license = "MIT"

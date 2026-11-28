@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.1.0 — 2026-11-28
+
+Fresh start of the clean-rewrite line (see `docs/rewrite-plan.md`), carrying
+the v3.0.0-beta TSF work plus the reset and the Helakuru golden keymap.
+
+### Fixed — installer
+- The installer no longer fails with "Error opening file for writing:
+  sinhala_typer_tsf.dll" when a previous install's text service is loaded
+  in running processes: the old exe/DLLs are renamed aside (rename works on
+  locked files, overwrite does not), the new files are written to the freed
+  paths, and the `.old` files are deleted on reboot. Uninstall now also uses
+  `/REBOOTOK` for the DLLs.
+
+### Changed — keymap (Helakuru golden table)
+- The keymap is re-based onto the captured Helakuru golden table
+  (`data/golden_pairs.csv`, 190 pairs; `engine/tests/golden.rs` asserts every
+  row): new tokens `ae`/`aae` (U+0D87/U+0D88), `RR` (U+0D8E), `jh`, `gn`,
+  `nj`; `ru`/`ruu` are plain r+vowel again (`R`/`RR` carry vocalic r);
+  `dya` renders dha + yansaya.
+
+### Engineering
+- Repo-level MIT `LICENSE`; honest README (v1.2.0 stays the fallback stable,
+  v2.0.0 marked deprecated); CI (`fmt`/`clippy`/`test`) on every push; one
+  installer (NSIS only); icon embedded from the committed `.ico`.
+
 ## 3.0.0 — 2026-11-28
 
 v2.0.0 was published without ever running on a real machine, and field

@@ -1,9 +1,9 @@
 ; Sinhala Typer installer (NSIS). Used by the GitHub Actions pipeline
 ; (.github/workflows/build.yml) and for local builds.
-; Build: makensis /DVERSION=3.0.0 /DEXE=<path to sinhala_typer.exe> /DTSF=<path to 64-bit sinhala_typer_tsf.dll> /DTSFX86=<path to 32-bit sinhala_typer_tsf.dll> /DICO=<path to sinhala_typer.ico> sinhala_typer.nsi
+; Build: makensis /DVERSION=2.1.0 /DEXE=<path to sinhala_typer.exe> /DTSF=<path to 64-bit sinhala_typer_tsf.dll> /DTSFX86=<path to 32-bit sinhala_typer_tsf.dll> /DICO=<path to sinhala_typer.ico> sinhala_typer.nsi
 
 !ifndef VERSION
-  !define VERSION "3.0.0"
+  !define VERSION "2.1.0"
 !endif
 !ifndef EXE
   !define EXE "..\target\x86_64-pc-windows-gnu\release\sinhala_typer.exe"
@@ -13,6 +13,7 @@
 !endif
 
 !include "MUI2.nsh"
+!include "LogicLib.nsh"
 
 Name "Sinhala Typer"
 OutFile "sinhala_typer-setup-${VERSION}.exe"
@@ -45,6 +46,23 @@ VIAddVersionKey "CompanyName" "Sinhala Typer"
 Section "Sinhala Typer" SecMain
   SectionIn RO
   SetOutPath "$INSTDIR"
+  ; A previously installed TSF DLL is loaded into running processes and the
+  ; companion exe may be running, so these files cannot be overwritten
+  ; directly ("Error opening file for writing"). Rename them aside first -
+  ; rename works on locked files and frees the path for the new file - and
+  ; delete the .old files on reboot. Unregister the old text service first
+  ; (best effort) so fewer processes hold the DLL.
+  ExecWait '"$SYSDIR\regsvr32.exe" /u /s "$INSTDIR\sinhala_typer_tsf.dll"'
+  ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\x86\sinhala_typer_tsf.dll"'
+  ${If} ${FileExists} "$INSTDIR\sinhala_typer_tsf.dll"
+    Rename "$INSTDIR\sinhala_typer_tsf.dll" "$INSTDIR\sinhala_typer_tsf.dll.old"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\x86\sinhala_typer_tsf.dll"
+    Rename "$INSTDIR\x86\sinhala_typer_tsf.dll" "$INSTDIR\x86\sinhala_typer_tsf.dll.old"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\sinhala_typer.exe"
+    Rename "$INSTDIR\sinhala_typer.exe" "$INSTDIR\sinhala_typer.exe.old"
+  ${EndIf}
   File /oname=sinhala_typer.exe "${EXE}"
 !ifdef TSF
   ; TSF text service for the Windows keyboard integration: the 64-bit DLL
@@ -64,6 +82,10 @@ Section "Sinhala Typer" SecMain
 !ifdef TSFX86
   ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /s "$INSTDIR\x86\sinhala_typer_tsf.dll"'
 !endif
+  ; Remove the renamed-aside files once nothing holds them (after reboot).
+  Delete /REBOOTOK "$INSTDIR\sinhala_typer_tsf.dll.old"
+  Delete /REBOOTOK "$INSTDIR\x86\sinhala_typer_tsf.dll.old"
+  Delete /REBOOTOK "$INSTDIR\sinhala_typer.exe.old"
   WriteRegStr HKCU "Software\Sinhala Typer" "InstallDir" "$INSTDIR"
   WriteUninstaller "$INSTDIR\uninstall.exe"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Sinhala Typer" "DisplayName" "Sinhala Typer"
@@ -98,10 +120,13 @@ Section "Uninstall"
   ; Unregister the TSF service (both bitnesses) before removing the DLLs.
   ExecWait '"$SYSDIR\regsvr32.exe" /u /s "$INSTDIR\sinhala_typer_tsf.dll"'
   ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\x86\sinhala_typer_tsf.dll"'
-  Delete "$INSTDIR\x86\sinhala_typer_tsf.dll"
+  Delete /REBOOTOK "$INSTDIR\x86\sinhala_typer_tsf.dll"
+  Delete /REBOOTOK "$INSTDIR\x86\sinhala_typer_tsf.dll.old"
   RMDir "$INSTDIR\x86"
-  Delete "$INSTDIR\sinhala_typer_tsf.dll"
-  Delete "$INSTDIR\sinhala_typer.exe"
+  Delete /REBOOTOK "$INSTDIR\sinhala_typer_tsf.dll"
+  Delete /REBOOTOK "$INSTDIR\sinhala_typer_tsf.dll.old"
+  Delete /REBOOTOK "$INSTDIR\sinhala_typer.exe"
+  Delete /REBOOTOK "$INSTDIR\sinhala_typer.exe.old"
   Delete "$INSTDIR\uninstall.exe"
   RMDir "$INSTDIR"
 SectionEnd

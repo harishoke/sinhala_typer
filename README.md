@@ -17,17 +17,17 @@
 
 ## ⚠️ Current status (read this first)
 
-- **v1.2.0 is the latest stable release** and the recommended download. It is the last release of the v1 architecture (tray app + keyboard hook).
-- **v3.0.0 is a beta pre-release** of the v2+ architecture (real TSF keyboards + tray-only companion). v2.0.0 of that architecture was **known broken** (keyboards did not appear in Windows Settings) and is marked deprecated; v3.0.0 fixes that but has **not yet been confirmed on a real Windows machine**.
-- The repository is being restructured per [docs/rewrite-plan.md](docs/rewrite-plan.md): the keymap is being re-based onto a captured Helakuru golden table (`data/golden_pairs.csv`).
+- **v2.1.0 is the current release** (clean-rewrite line, see [docs/rewrite-plan.md](docs/rewrite-plan.md)): real TSF keyboards + Helakuru golden keymap + fixed installer.
+- **v1.2.0** is the fallback stable of the old v1 architecture (tray app + keyboard hook).
+- v2.0.0 was **known broken** (keyboards did not appear in Windows Settings) and is marked deprecated; the 3.0.0 beta was never confirmed on real hardware and is superseded by v2.1.0.
 
 ## ⬇️ Download
 
 | | |
 | :--- | :--- |
-| **Stable installer (v1.2.0)** | [sinhala_typer-setup-1.2.0.exe](https://github.com/harishoke/sinhala_typer/releases/download/v1.2.0/sinhala_typer-setup-1.2.0.exe) — per-user install, no admin needed |
-| **Stable portable (v1.2.0)** | [sinhala_typer.exe](https://github.com/harishoke/sinhala_typer/releases/download/v1.2.0/sinhala_typer.exe) — single file, just run it |
-| **Beta (v3.0.0, TSF keyboards)** | [sinhala_typer-setup-3.0.0.exe](https://github.com/harishoke/sinhala_typer/releases/download/v3.0.0/sinhala_typer-setup-3.0.0.exe) — pre-release, see warning above |
+| **Installer (current, v2.1.0)** | [sinhala_typer-setup-2.1.0.exe](https://github.com/harishoke/sinhala_typer/releases/download/v2.1.0/sinhala_typer-setup-2.1.0.exe) — per-user install, one admin prompt to register the keyboards |
+| **Portable (v2.1.0)** | [sinhala_typer.exe](https://github.com/harishoke/sinhala_typer/releases/download/v2.1.0/sinhala_typer.exe) — single file, just run it |
+| **Fallback stable (v1.2.0, old architecture)** | [sinhala_typer-setup-1.2.0.exe](https://github.com/harishoke/sinhala_typer/releases/download/v1.2.0/sinhala_typer-setup-1.2.0.exe) |
 
 ## ✨ Features
 
